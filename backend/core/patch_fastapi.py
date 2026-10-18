@@ -1,13 +1,15 @@
 """
-patch_fastapi.py — FastAPI 0.135.x Bug 补丁管理
+patch_fastapi.py — FastAPI openapi/utils.py Bug 补丁管理
 =================================================
-BUG:  FastAPI 0.135.x openapi/utils.py
-      _get_openapi_path() 中局部变量 status_code 在两个独立 if 分支内赋值，
+BUG:  _get_openapi_path() 中局部变量 status_code 在两个独立 if 分支内赋值，
       当路由返回 StreamingResponse 时两分支均不满足 → UnboundLocalError
       → /openapi.json → 500 Internal Server Error
 
       StreamingResponse.__init__ signature 中 status_code=None（默认值，非int），
       导致进入 "status_code_param 不是 None 但 default 不是 int" 的分支。
+
+      实测（2026-10-18）：V7 锁定的 fastapi==0.115.5 同样含此 bug，
+      且源码结构与 0.135.x 不同——补丁需按版本匹配两套 pattern（见 _apply）。
 
 PATCH（已注入 site-packages）:
     在 L352 后：
@@ -199,21 +201,43 @@ def _apply(src: str) -> str | None:
 
     result = src
 
-    # Patch A
-    if OLD_A not in result:
-        log.debug(f"Patch A target not found in source")
-        return None
-    result = result.replace(OLD_A, NEW_A, 1)
-    log.debug("Patch A applied")
+    # FastAPI 0.135.x 结构
+    if OLD_A in result and OLD_B in result:
+        result = result.replace(OLD_A, NEW_A, 1)
+        result = result.replace(OLD_B, NEW_B, 1)
+        log.debug("Patch A/B applied (fastapi 0.135.x)")
+        return result
 
-    # Patch B
-    if OLD_B not in result:
-        log.debug("Patch B target not found")
-        return None
-    result = result.replace(OLD_B, NEW_B, 1)
-    log.debug("Patch B applied")
+    # ── Patch C: FastAPI 0.115.x 结构（V7 锁定 fastapi==0.115.5）──────────────
+    # 原文片段（精确缩进，0.115.5 实测）：
+    #                 if status_code_param is not None:
+    #                     if isinstance(status_code_param.default, int):
+    #                         status_code = str(status_code_param.default)
+    #             operation.setdefault("responses", {}).setdefault(status_code, {})[
+    # 两个分支均可能不赋值 status_code → UnboundLocalError
+    OLD_C = (
+        '                if status_code_param is not None:\n'
+        '                    if isinstance(status_code_param.default, int):\n'
+        '                        status_code = str(status_code_param.default)\n'
+        '            operation.setdefault("responses", {}).setdefault(status_code, {})[\n'
+    )
+    NEW_C = (
+        '                if status_code_param is not None:\n'
+        '                    if isinstance(status_code_param.default, int):\n'
+        '                        status_code = str(status_code_param.default)\n'
+        '                    else:\n'
+        '                        status_code = "200"\n'
+        '                else:\n'
+        '                    status_code = "200"\n'
+        '            operation.setdefault("responses", {}).setdefault(status_code, {})[\n'
+    )
+    if OLD_C in result:
+        result = result.replace(OLD_C, NEW_C, 1)
+        log.debug("Patch C applied (fastapi 0.115.x)")
+        return result
 
-    return result
+    log.debug("Patch target not found in source")
+    return None
 
 
 def _revert(src: str) -> str:

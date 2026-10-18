@@ -25,7 +25,10 @@ if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_pref
     print()
     print("venv 仅用于：部署/交接场景")
     print()
-    input("按回车继续（或 Ctrl+C 退出）...")
+    if sys.stdin.isatty():
+        input("按回车继续（或 Ctrl+C 退出）...")
+    else:
+        print("（非交互环境检测到 venv，自动继续）")
 
 import os
 import sys

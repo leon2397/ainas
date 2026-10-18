@@ -48,7 +48,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-访问 **http://localhost:8000**，默认账号 `admin` / `admin123`（**首次登录后请立即修改密码**）。
+访问 **http://localhost:8000**。首次启动时系统会**随机生成 admin 密码并打印在启动日志中**（loguru 控制台输出，含 `Password: xxx`），从日志中获取密码登录，**登录后请立即修改密码**。忘记密码时用 `python backend/reset_password.py` 重置为 `admin123`。
 
 ### 本地运行（开发/验证）
 
