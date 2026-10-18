@@ -251,6 +251,14 @@ class APIModule {
         return this.request(`/api/tasks/${taskId}`);
     }
 
+    // 扫描服务器媒体目录（增量索引入库）
+    async scanMedia(path, recursive = true) {
+        return this.request('/api/actions/scan', {
+            method: 'POST',
+            body: JSON.stringify({ path, recursive })
+        });
+    }
+
     async cancelTask(taskId) {
         return this.request(`/api/tasks/${taskId}`, { method: 'DELETE' });
     }

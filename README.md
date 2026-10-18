@@ -44,9 +44,11 @@
 
 ```bash
 cp .env.example .env
-# 编辑 .env：设置 NAS_PATH 为你的媒体文件目录，生成 AI_NAS_JWT_SECRET
+# 编辑 .env：设置 NAS_PATH 为你的媒体文件目录（宿主机路径），生成 AI_NAS_JWT_SECRET
 docker compose up -d
 ```
+
+该目录会挂载到容器内的 `/nas`。启动后进入 **媒体库 → 扫描目录**，输入 `/nas` 开始扫描（完整流程见下方「接入媒体目录」）。
 
 访问 **http://localhost:8000**。首次启动时系统会**随机生成 admin 密码并打印在启动日志中**（loguru 控制台输出，含 `Password: xxx`），从日志中获取密码登录，**登录后请立即修改密码**。忘记密码时用 `python backend/reset_password.py` 重置为 `admin123`。
 
@@ -55,15 +57,49 @@ docker compose up -d
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r backend/requirements-min.txt          # 轻量依赖；完整 AI 依赖用 backend/requirements.txt
-export NAS_PATH=./nas                                # Windows: set NAS_PATH=./nas
 python backend/main.py
 ```
+
+启动后在 **媒体库 → 扫描目录** 中输入媒体目录路径（如 `E:/pic`）即可入库。
 
 ### 一键安装（Linux）
 
 ```bash
 sudo bash deploy/install.sh
 ```
+
+安装后媒体目录为 `/data/ai-nas/media`（可用 `DATA_DIR` 环境变量修改），在 **媒体库 → 扫描目录** 输入该路径开始扫描。
+
+## 接入媒体目录
+
+系统通过「扫描」将媒体文件索引入库——**不移动、不复制原文件**，仅在数据库中记录路径与元数据，原目录可随时增删。
+
+### 方式一：Web 界面（推荐）
+
+1. 登录后进入 **媒体库** 页面
+2. 点击工具栏 **扫描目录** 按钮
+3. 输入服务器本机可访问的目录路径：
+   - 本地运行：如 `E:/pic`、`/volume1/photo`
+   - Docker 部署：容器内路径，默认为 `/nas`（由 .env 的 `NAS_PATH` 挂载）
+   - Linux 一键安装：`/data/ai-nas/media`
+4. 勾选「包含子目录」，点击 **开始扫描**
+5. 扫描在后台执行，完成后媒体库自动刷新；**重复扫描为增量更新**（已有文件只更新记录，不会重复入库）
+
+### 方式二：API
+
+```bash
+curl -X POST http://localhost:8000/api/actions/scan \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"path": "E:/pic", "recursive": true}'
+```
+
+### 支持格式与提取信息
+
+- 图片：jpg / jpeg / png / gif / bmp / webp / heic / tiff / raw / cr2 / nef / arw / dng
+- 视频：mp4 / mov / avi / mkv / flv / wmv / m4v / mpg / 3gp
+- 自动提取：EXIF 拍摄时间、相机型号、GPS 位置；文件首尾哈希用于去重
+- 缩略图按需生成，首次浏览时自动缓存
 
 ## 已测试环境
 

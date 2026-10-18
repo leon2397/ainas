@@ -260,6 +260,7 @@ window.exitBatchMode = () => mediaPage.exitBatchMode();
 window.selectAllVisible = () => mediaPage.selectAll();
 window.loadMoreMedia = () => mediaPage.loadMore();
 window.toggleAdvancedSearch = () => mediaPage.toggleAdvancedSearch();
+window.toggleScanPanel = () => mediaPage.toggleScanPanel();
 window.performAdvancedSearch = () => mediaPage.performAdvancedSearch();
 window.showBatchTagModal = () => mediaPage.showBatchTagModal();
 window.batchAddTags = () => mediaPage.batchAddTags();

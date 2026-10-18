@@ -326,6 +326,63 @@ export class MediaPage {
         if (!this.currentMediaId) return;
         showToast('AI 分析任务已提交', 'info');
     }
+
+    // ===== 媒体目录扫描 =====
+    toggleScanPanel() {
+        const panel = document.getElementById('media-scan-panel');
+        if (!panel) return;
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        const input = document.getElementById('scan-path');
+        if (panel.style.display === 'block' && input && !input.value) {
+            input.value = localStorage.getItem('lastScanPath') || '';
+        }
+    }
+
+    async startScan() {
+        const path = document.getElementById('scan-path').value.trim();
+        if (!path) {
+            showToast('请输入要扫描的目录路径', 'warning');
+            return;
+        }
+        const recursive = document.getElementById('scan-recursive').checked;
+        const statusEl = document.getElementById('scan-status');
+        const btn = document.getElementById('scan-start-btn');
+        try {
+            btn.disabled = true;
+            statusEl.style.display = 'block';
+            statusEl.textContent = '扫描任务已启动，正在后台索引媒体文件...';
+            const res = await api.scanMedia(path, recursive);
+            localStorage.setItem('lastScanPath', path);
+            showToast(`扫描已启动：${path}`, 'success');
+            this.pollScanTask(res.task_id, statusEl, btn);
+        } catch (e) {
+            statusEl.textContent = '扫描启动失败：' + e.message;
+            btn.disabled = false;
+        }
+    }
+
+    async pollScanTask(taskId, statusEl, btn) {
+        try {
+            const task = await api.getTaskDetail(taskId);
+            if (task.status === 'success' || task.status === 'failed') {
+                btn.disabled = false;
+                if (task.status === 'success') {
+                    statusEl.textContent = '扫描完成，媒体库已刷新';
+                    showToast('扫描完成', 'success');
+                    await this.load();
+                } else {
+                    statusEl.textContent = '扫描失败：' + (task.error_msg || '未知错误');
+                    showToast('扫描失败', 'danger');
+                }
+                return;
+            }
+            statusEl.textContent = `扫描进行中（状态：${task.status}）...`;
+            setTimeout(() => this.pollScanTask(taskId, statusEl, btn), 3000);
+        } catch (e) {
+            btn.disabled = false;
+            statusEl.textContent = '任务状态查询失败：' + e.message;
+        }
+    }
 }
 
 export const mediaPage = new MediaPage();
