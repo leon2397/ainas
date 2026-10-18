@@ -381,3 +381,6 @@ class APIModule {
 
 export const api = new APIModule();
 export default api;
+
+// 暴露到 window，便于控制台调试与未来的内联事件调用
+window.api = api;

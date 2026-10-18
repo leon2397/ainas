@@ -40,13 +40,47 @@ class App {
             }
             
             const module = await loader();
-            const PageClass = module[`${pageName}Page`];
-            this.pages[pageName] = new PageClass();
+            // 页面模块同时导出类（XxxPage）与单例（xxxPage）。
+            // 优先使用单例——它与模块内 window.xxxPage 指向同一对象。
+            // （历史 bug：此处曾写 new module['xxxPage']()，对单例对象执行 new
+            //   必然抛 "PageClass is not a constructor"，13 个页面全部加载失败，
+            //   整个前端的动态数据渲染都是死的）
+            const instanceKey = `${pageName}Page`;
+            let page = module[instanceKey];
+            if (!page || typeof page.load !== 'function') {
+                const classKey = `${pageName.charAt(0).toUpperCase()}${pageName.slice(1)}Page`;
+                const PageClass = module[classKey];
+                page = PageClass ? new PageClass() : null;
+            }
+            if (!page) {
+                console.warn(`Page module has no usable export: ${pageName}`);
+                return null;
+            }
+            this.pages[pageName] = page;
             this.loadedPages.add(pageName);
-            return this.pages[pageName];
+            this.bindPageMethods(pageName, page);
+            return page;
         } catch (e) {
             console.error(`Failed to load page ${pageName}:`, e);
             return null;
+        }
+    }
+
+    /**
+     * 将页面实例的公共方法暴露到 window，供 HTML 内联 onclick 调用。
+     * 不覆盖已存在的全局绑定（app.js 底部的显式委托优先）。
+     */
+    bindPageMethods(pageName, page) {
+        let proto = page.constructor.prototype;
+        while (proto && proto !== Object.prototype) {
+            for (const key of Object.getOwnPropertyNames(proto)) {
+                if (key === 'constructor' || key.startsWith('_')) continue;
+                const fn = page[key];
+                if (typeof fn === 'function' && !(key in window)) {
+                    window[key] = fn.bind(page);
+                }
+            }
+            proto = Object.getPrototypeOf(proto);
         }
     }
 
@@ -253,56 +287,72 @@ window.logout = () => app.logout();
 window.toggleSidebar = () => app.toggleSidebar();
 window.closeSidebar = () => app.closeSidebar();
 
+/**
+ * 页面方法委托工厂：按需加载页面模块后调用其方法。
+ * 历史上这些处理器直接引用 mediaPage/albumsPage 等单例，但 app.js
+ * 从未 import 它们——每次点击都是 ReferenceError。统一走
+ * loadPageModule 懒加载，模块未加载过时会自动加载。
+ */
+function onPage(page, method) {
+    return (...args) => app.loadPageModule(page).then(p => p && p[method](...args));
+}
+
 // Filter media type from dashboard
 window.filterMediaType = (type) => {
-    mediaPage.filterByType(type);
     app.showPage('media');
+    app.loadPageModule('media').then(p => p && p.filterByType(type));
 };
 
 // Media page functions
-window.toggleBatchMode = () => mediaPage.toggleBatchMode();
-window.exitBatchMode = () => mediaPage.exitBatchMode();
-window.selectAllVisible = () => mediaPage.selectAll();
-window.loadMoreMedia = () => mediaPage.loadMore();
-window.toggleAdvancedSearch = () => mediaPage.toggleAdvancedSearch();
-window.toggleScanPanel = () => mediaPage.toggleScanPanel();
-window.performAdvancedSearch = () => mediaPage.performAdvancedSearch();
-window.showBatchTagModal = () => mediaPage.showBatchTagModal();
-window.batchAddTags = () => mediaPage.batchAddTags();
-window.batchDelete = () => mediaPage.batchDelete();
-window.deleteCurrentMedia = () => mediaPage.deleteCurrent();
-window.downloadMedia = () => mediaPage.downloadCurrent();
-window.runAIClassify = () => mediaPage.runAIClassify();
-window.showAddToAlbumModal = () => albumsPage.showAddToAlbumModal(mediaPage.selectedFiles);
+window.toggleBatchMode = onPage('media', 'toggleBatchMode');
+window.exitBatchMode = onPage('media', 'exitBatchMode');
+window.selectAllVisible = onPage('media', 'selectAll');
+window.loadMoreMedia = onPage('media', 'loadMore');
+window.toggleAdvancedSearch = onPage('media', 'toggleAdvancedSearch');
+window.toggleScanPanel = onPage('media', 'toggleScanPanel');
+window.performAdvancedSearch = onPage('media', 'performAdvancedSearch');
+window.showBatchTagModal = onPage('media', 'showBatchTagModal');
+window.batchAddTags = onPage('media', 'batchAddTags');
+window.batchDelete = onPage('media', 'batchDelete');
+window.deleteCurrentMedia = onPage('media', 'deleteCurrent');
+window.downloadMedia = onPage('media', 'downloadCurrent');
+window.runAIClassify = onPage('media', 'runAIClassify');
+window.showAddToAlbumModal = async () => {
+    const media = await app.loadPageModule('media');
+    const albums = await app.loadPageModule('albums');
+    albums.showAddToAlbumModal(media.selectedFiles);
+};
 
 // Album page functions
-window.loadAlbums = () => albumsPage.load();
-window.showCreateAlbumModal = () => albumsPage.showCreateModal();
-window.createAlbum = () => albumsPage.create();
+window.loadAlbums = onPage('albums', 'load');
+window.showCreateAlbumModal = onPage('albums', 'showCreateModal');
+window.createAlbum = onPage('albums', 'create');
 window.addToAlbum = async () => {
-    const success = await albumsPage.addToAlbum(mediaPage.selectedFiles);
+    const media = await app.loadPageModule('media');
+    const albums = await app.loadPageModule('albums');
+    const success = await albums.addToAlbum(media.selectedFiles);
     if (success) {
-        mediaPage.exitBatchMode();
+        media.exitBatchMode();
     }
 };
 
 // Device page functions
-window.loadDevices = () => devicesPage.load();
-window.showAddDeviceModal = () => devicesPage.showAddModal();
-window.addDevice = () => devicesPage.add();
+window.loadDevices = onPage('devices', 'load');
+window.showAddDeviceModal = onPage('devices', 'showAddModal');
+window.addDevice = onPage('devices', 'add');
 
 // Task page functions
-window.loadTasks = () => tasksPage.load();
+window.loadTasks = onPage('tasks', 'load');
 
 // User page functions
-window.loadUsers = () => usersPage.load();
-window.showCreateUserModal = () => usersPage.showCreateModal();
-window.createUser = () => usersPage.create();
+window.loadUsers = onPage('users', 'load');
+window.showCreateUserModal = onPage('users', 'showCreateModal');
+window.createUser = onPage('users', 'create');
 
 // Settings page functions
-window.loadSettings = () => settingsPage.load();
-window.showChangePasswordModal = () => settingsPage.showChangePasswordModal();
-window.changePassword = () => settingsPage.changePassword();
+window.loadSettings = onPage('settings', 'load');
+window.showChangePasswordModal = onPage('settings', 'showChangePasswordModal');
+window.changePassword = onPage('settings', 'changePassword');
 
 // Initialize app
 const app = new App();

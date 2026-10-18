@@ -59,7 +59,8 @@ export class DashboardPage {
     }
 
     renderRecentTasks(tasks) {
-        const container = document.getElementById('recent-tasks-list');
+        const container = document.getElementById('recent-tasks');
+        if (!container) return;
         if (!tasks || tasks.length === 0) {
             container.innerHTML = '<div class="text-muted text-center py-3">暂无最近任务</div>';
             return;
@@ -77,6 +78,7 @@ export class DashboardPage {
 
     renderDeviceStatus(devices) {
         const container = document.getElementById('device-status-list');
+        if (!container) return;
         if (!devices || devices.length === 0) {
             container.innerHTML = '<div class="text-muted text-center py-3">暂无在线设备</div>';
             return;
