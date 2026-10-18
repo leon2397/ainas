@@ -14,6 +14,8 @@ import tempfile
 import subprocess
 
 from database.db import Database, get_db
+from modules.mod_media.scanner import get_scanner
+from core.logger import logger
 
 router = APIRouter(prefix="/api/media", tags=["Media"])
 
@@ -140,6 +142,28 @@ async def count_media_by_type(db: Database = Depends(get_db)):
     images = await db.fetchone("SELECT COUNT(*) as cnt FROM media_files WHERE file_type='image' AND is_deleted=FALSE")
     videos = await db.fetchone("SELECT COUNT(*) as cnt FROM media_files WHERE file_type='video' AND is_deleted=FALSE")
     return {"images": images['cnt'] if images else 0, "videos": videos['cnt'] if videos else 0}
+
+
+@router.get("/count/reconcile")
+async def reconcile_media_counts(
+    path: str = Query(..., description="要对账的扫描根目录，与 /api/actions/scan 同一路径"),
+    recursive: bool = Query(True, description="是否递归子目录"),
+    file_type: Optional[str] = Query(None, description="image / video / 不传为全部"),
+    db: Database = Depends(get_db),
+):
+    """
+    素材计数对账（dry-run，不写库）：比较数据库记录与磁盘实际文件。
+    consistent=true 表示 /api/media/count/by-type 的计数与磁盘一致；
+    false 时 diff 给出 phantom(库有盘无)/missing(盘有库无)/
+    revivable(库中记录被软删除但文件已回来)/type_mismatch 四类差异明细，
+    执行一次同路径扫描即可自动修正。
+    """
+    scanner = await get_scanner(db)
+    result = await scanner.reconcile(
+        root_path=path, recursive=recursive, file_type=file_type)
+    if 'error' in result:
+        raise HTTPException(status_code=400, detail=result['error'])
+    return result
 
 
 @router.get("/search/", response_model=List[MediaFileResponse])
@@ -437,6 +461,50 @@ def _is_cache_valid(cached_path: str, original_path: str) -> bool:
     return cached_mtime >= original_mtime
 
 
+def _extract_video_first_frame(file_path: str):
+    """提取视频首帧，返回 PIL Image；失败返回 None。
+
+    优先用 OpenCV（opencv-python-headless 是核心硬依赖，无需外部二进制），
+    ffmpeg 仅作备选——历史上直接 subprocess ffmpeg，而 ffmpeg 既不在
+    Windows PATH 也不在 Docker 镜像里，导致视频缩略图全部 500
+    （WinError 2 系统找不到指定的文件）。
+    """
+    # 方案 1：OpenCV 直接解码首帧
+    try:
+        import cv2
+        cap = cv2.VideoCapture(file_path)
+        if cap.isOpened():
+            ok, frame = cap.read()
+            cap.release()
+            if ok and frame is not None:
+                from PIL import Image
+                return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        else:
+            cap.release()
+    except Exception as e:
+        logger.warning(f"[Thumbnail] cv2 提帧失败 {file_path}: {e}")
+
+    # 方案 2：ffmpeg 备选（系统安装了才可用）
+    try:
+        from PIL import Image
+        tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+        try:
+            subprocess.run(
+                ['ffmpeg', '-i', file_path, '-ss', '0', '-vframes', '1', '-y', tmp_path],
+                capture_output=True, timeout=10
+            )
+            if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+                return Image.open(tmp_path)
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+    except Exception:
+        pass
+    return None
+
+
 # ============ Routes ============
 
 @router.get("/{file_id}/thumbnail")
@@ -464,23 +532,17 @@ async def get_thumbnail(
         from PIL import Image
         
         if file['file_type'] == 'video':
-            tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
-            tmp_path = tmp.name
-            tmp.close()
-            try:
-                subprocess.run([
-                    'ffmpeg', '-i', file_path, '-ss', '0', '-vframes', '1',
-                    '-vf', f'scale={size}:{size}:force_original_aspect_ratio=decrease',
-                    '-y', tmp_path
-                ], capture_output=True, timeout=10)
-                if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
-                    img_data = open(tmp_path, 'rb').read()
-                    open(cache_path, 'wb').write(img_data)
-                    return Response(content=img_data, media_type='image/jpeg')
-            finally:
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
-            raise HTTPException(status_code=500, detail="Video thumbnail generation failed")
+            img = _extract_video_first_frame(file_path)
+            if img is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="视频缩略图生成失败：cv2 与 ffmpeg 均无法提取视频帧"
+                )
+            if img.mode in ('RGBA', 'P'):
+                img = img.convert('RGB')
+            img.thumbnail((size, size), Image.Resampling.LANCZOS)
+            img.save(cache_path, format='JPEG', quality=85)
+            return FileResponse(cache_path, media_type='image/jpeg')
         else:
             img = Image.open(file_path)
             img.thumbnail((size, size), Image.Resampling.LANCZOS)

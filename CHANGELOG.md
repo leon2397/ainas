@@ -8,6 +8,62 @@
 
 ---
 
+## [未发布] - 2026-10-18 —— 素材计数准确性加固
+
+> 需求：素材数量识别必须准确（基础功能）。三方对账（磁盘 8,662 = 数据库 8,662 = FTS 8,662 = API 8418+244）确认当前快照准确；本次把"准确"从偶然变为机制保证。
+
+### 修复（Fixed）
+
+| # | 问题 | 影响 |
+|---|------|------|
+| 1 | 扫描器只增不删：文件在 AINAS 外被删/移后重扫不清除旧记录 | 计数永久虚高（幽灵记录） |
+| 2 | 26 扩展名 × 大小写 = 52 次全树 rglob | 大库扫描 O(52n) 性能浪费 |
+| 3 | 混合大小写扩展名（`.Jpg`）在 Linux 大小写敏感 FS 下漏扫 | Docker/Linux 部署漏数 |
+| 4 | 已存在文件一律计为 `updated`、且每次刷新 `updated_at` | 扫描统计虚报 |
+| 5 | `POST /api/actions/scan` 的 `file_type` 参数被忽略 | 按类型扫描不生效 |
+| 6 | 扫描任务结果被丢弃（`run_scan` 不落库 result） | 用户看不到扫描数字 |
+| 7 | `services.scanner` shim 未导出 `IMAGE_EXTENSIONS` 等，test_scanner.py 自迁移后无法收集 | 测试套件实际从未运行（实证） |
+| 8 | test_scan_with_images_only 断言错误（6 个文件断言 total==4） | 同证测试从未运行 |
+
+### 新增（Added）
+
+- **`GET /api/media/count/reconcile`**：计数对账端点（dry-run 不写库），四类差异（phantom/missing/revivable/type_mismatch）+ `consistent` 结论，准确性随时可验证
+- 扫描统计新增 `unchanged` / `removed` / `walk_errors` / `error_files` 字段；`total = images + videos + errors` 口径恒等
+- 任务 `result` 回传扫描统计，媒体页扫描完成时展示具体数字
+- 扩展名白名单扩充：图片 `+avif/jfif/pjpeg`，视频 `+3g2/m2ts/mts/rmvb/ogv/vob`（`.ts` 刻意排除：与 TypeScript 源码歧义）
+
+### 测试（Tests）
+
+- `tests/unit/test_scanner.py`：34 全过（新增消失文件软删除/复活、清理范围隔离、大小写归一、新格式、统计口径、对账预览共 9 类用例）
+- `backend/requirements.txt` 解除 pytest/pytest-asyncio/httpx 注释（此前被注释是测试从未跑过的直接原因）
+
+### 已知遗留（不在本次范围）
+
+- ~~`tests/unit/test_database.py` 14 失败 + `test_auth.py` 1 失败~~ → **已清理（80/80 全绿），见下方「测试基建」**
+- F0 ① `DATABASE_PATH="./data/metadata.db"` 相对 cwd：本次冒烟时实测复现双库（`backend/data/` 下误建空库已隔离为 `metadata.db.accidental-20261018`），路径修复待专项
+
+### 测试基建（Tests）—— 2026-10-18 晚间追加
+
+> 触发：服务进程异常退出后复盘，发现「测试从未真正运行」的又一实证——db.py 重构改了 API，14 个数据库测试全红却无人发现。
+
+- `tests/unit/test_database.py` 重写适配现行 API：`add_media_file(dict)` / `update_ai_analysis` / `search_media`(FTS) / `create_album(name, album_type)` / `create_task(task_id, …)`；已删便捷方法的验证改用 `fetchall/fetchone/fetchval` 原语（与路由层一致）
+- 修复 `test_auth.py::test_update_user_role` 暴露的真 bug：`mod_auth/service.py` 的 `update_user_role` / `toggle_user` / `delete_user` 在内存认证模式下只写 DB 分支、漏 fallback 分支，操作静默无效——已补全（缺陷 #12）
+- `tests/conftest.py` 增加 `pytest_terminal_summary(trylast)` 强制退出钩子：aiosqlite 的 `Connection` 继承 `Thread` 且非 daemon，未关闭连接会挂住进程退出（测试跑完汇总后 pytest 永不返回，CI 必超时）
+- **全量结果：`pytest backend/tests/unit/` → 80 tests, 0 failures, 0 errors, ~2s**（test_scanner 34 + test_auth 13 + test_database 19 + 参数化展开）
+- 注：CLI 直跑 pytest 的终端汇总仍会被退出挂死吞掉（上述钩子在部分环境不触发），CI 建议加 `--junit-xml` 取结果；进程退出挂死的根因修复（连接收尾/daemon 化）列入 F0
+
+### 修复（Fixed）—— 视频缩略图与孤儿进程（缺陷 #10/#11）
+
+| # | 问题 | 影响 |
+|---|------|------|
+| 10 | 视频缩略图提帧直接 `subprocess ffmpeg`，ffmpeg 既不在 Windows PATH 也不在 Docker 镜像 | 视频缩略图全部 500（WinError 2）；Windows 直接运行与 Docker 两条路都坏 |
+| 11 | uvicorn 父进程死后 worker 变孤儿继续占端口 | 端口不释放、代码更新不生效 |
+
+- #10 修复：`routes/media.py` 新增 `_extract_video_first_frame()`，cv2.VideoCapture 直接解码首帧（opencv 为硬依赖，无需外部二进制），ffmpeg 降级备选；8/8 视频抽测通过（含中文路径），图片无回归
+- #11 处置：TROUBLESHOOTING 补充重启前杀干净 LISTENING PID 的运维步骤
+
+---
+
 ## [v1.0.0] - 2026-10-18 —— 重建基线（Re baseline）
 
 > 从 V7.0.0 拣选产品文件重组为干净可运行的产品仓库，冒烟 + 端到端验证通过。

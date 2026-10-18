@@ -221,6 +221,10 @@ class AuthManager:
             raise ValueError(f"无效角色: {role}")
         if self._use_db:
             await self._db.update_user_role(username, role)
+        else:
+            self._load_fallback_users()
+            if username in self._fallback_users:
+                self._fallback_users[username]["role"] = role
 
     async def update_password(self, username: str, old_password: str, new_password: str) -> bool:
         """修改密码"""
@@ -243,6 +247,10 @@ class AuthManager:
             raise ValueError("不能禁用管理员账户")
         if self._use_db:
             await self._db.toggle_user_disabled(username, disabled)
+        else:
+            self._load_fallback_users()
+            if username in self._fallback_users:
+                self._fallback_users[username]["disabled"] = disabled
 
     async def delete_user(self, username: str):
         """删除用户"""
@@ -250,6 +258,9 @@ class AuthManager:
             raise ValueError("不能删除管理员账户")
         if self._use_db:
             await self._db.delete_user(username)
+        else:
+            self._load_fallback_users()
+            self._fallback_users.pop(username, None)
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """创建访问令牌"""

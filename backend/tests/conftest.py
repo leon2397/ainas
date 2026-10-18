@@ -24,3 +24,14 @@ def test_db_path(backend_root, tmp_path_factory):
     """
     db_dir = tmp_path_factory.mktemp("test_db")
     return str(db_dir / "test_metadata.db")
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """强制退出：aiosqlite 的 Connection 继承 Thread 且非 daemon，
+    未关闭的连接会挂住进程退出（测试跑完、汇总打完后 pytest 仍永不返回）。
+    在 terminal_summary 之后（trylast）退出，确保 CI/命令行拿到退出码。"""
+    import os, sys
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(int(exitstatus))

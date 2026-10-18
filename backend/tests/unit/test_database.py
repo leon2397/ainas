@@ -1,12 +1,18 @@
 """
 test_database.py - 数据库模块单元测试
 =====================================
-覆盖范围：
-  1. 数据库初始化
-  2. CRUD 操作（媒体文件）
-  3. 用户管理
-  4. 索引与查询
-  5. 事务处理
+覆盖范围（对齐 modules.mod_database.Database 当前 API）：
+  1. 数据库初始化与表/索引创建
+  2. 媒体文件 CRUD（add_media_file / update_ai_analysis / search_media）
+  3. 相册管理（create_album / get_albums）
+  4. 用户管理（create_user / get_user_by_username / 改密码 / 改角色）
+  5. 任务管理（create_task / update_task_status）
+
+注意：Database 经重构已精简为「少量方法 + fetchall/fetchone/fetchval 原语」，
+路由层均直接用原语写 SQL。本测试随之适配：已删除的便捷方法
+（get_media_file / list_media_files / delete_media_file / get_media_count /
+get_album / list_albums / add_media_to_album / get_task）对应的验证
+统一改用原语查询，不再作为独立方法测试。
 
 运行：
   cd backend
@@ -16,19 +22,13 @@ test_database.py - 数据库模块单元测试
 import pytest
 import sys
 import os
-import tempfile
-import asyncio
 from pathlib import Path
-from datetime import datetime
-
-# 设置测试环境
-os.environ["AI_NAS_DB_PATH"] = ":memory:"
 
 # 添加 backend 到 path
 backend_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_root))
 
-from database.db import Database
+from modules.mod_database import Database
 
 
 class TestDatabaseInit:
@@ -39,10 +39,10 @@ class TestDatabaseInit:
         """测试数据库初始化"""
         db = Database(":memory:")
         await db.init()
-        
+
         assert db is not None
-        assert db._connection is not None
-        
+        assert db._conn is not None
+
         await db.close()
 
     @pytest.mark.asyncio
@@ -50,19 +50,18 @@ class TestDatabaseInit:
         """测试数据库表创建"""
         db = Database(":memory:")
         await db.init()
-        
-        # 检查表是否存在
+
         tables = await db.fetchall(
             "SELECT name FROM sqlite_master WHERE type='table'",
             ()
         )
         table_names = [t["name"] for t in tables]
-        
+
         assert "media_files" in table_names
         assert "albums" in table_names
         assert "users" in table_names
         assert "tasks" in table_names
-        
+
         await db.close()
 
 
@@ -79,132 +78,128 @@ class TestMediaFiles:
 
     @pytest.mark.asyncio
     async def test_add_media_file(self, db):
-        """测试添加媒体文件"""
-        file_path = "/test/media/image.jpg"
-        file_name = "image.jpg"
-        file_type = "image"
-        
-        media_id = await db.add_media_file(
-            file_path=file_path,
-            file_name=file_name,
-            file_type=file_type,
-            file_size=1024000,
-            mime_type="image/jpeg"
-        )
-        
+        """测试添加媒体文件（dict 入参）"""
+        media_id = await db.add_media_file({
+            "file_path": "/test/media/image.jpg",
+            "file_name": "image.jpg",
+            "file_type": "image",
+            "file_size": 1024000,
+            "mime_type": "image/jpeg"
+        })
+
         assert media_id is not None
         assert isinstance(media_id, int)
 
     @pytest.mark.asyncio
     async def test_get_media_file(self, db):
-        """测试获取媒体文件"""
-        # 添加文件
-        media_id = await db.add_media_file(
-            file_path="/test/image.jpg",
-            file_name="image.jpg",
-            file_type="image",
-            file_size=1024000
+        """测试获取媒体文件（原语查询）"""
+        media_id = await db.add_media_file({
+            "file_path": "/test/image.jpg",
+            "file_name": "image.jpg",
+            "file_type": "image",
+            "file_size": 1024000
+        })
+
+        media = await db.fetchone(
+            "SELECT * FROM media_files WHERE id = ?", (media_id,)
         )
-        
-        # 获取文件
-        media = await db.get_media_file(media_id)
-        
+
         assert media is not None
         assert media["id"] == media_id
         assert media["file_path"] == "/test/image.jpg"
         assert media["file_name"] == "image.jpg"
 
     @pytest.mark.asyncio
-    async def test_update_media_file(self, db):
-        """测试更新媒体文件"""
-        # 添加文件
-        media_id = await db.add_media_file(
-            file_path="/test/image.jpg",
-            file_name="image.jpg",
-            file_type="image"
-        )
-        
-        # 更新文件
-        await db.update_media_file(
+    async def test_update_ai_analysis(self, db):
+        """测试 AI 分析结果更新"""
+        media_id = await db.add_media_file({
+            "file_path": "/test/image.jpg",
+            "file_name": "image.jpg",
+            "file_type": "image"
+        })
+
+        await db.update_ai_analysis(
             media_id,
-            tags='["nature", "landscape"]',
-            ai_processed=True
+            tags=["nature", "landscape"],
+            feature_vector=b"\x00\x01\x02",
+            confidence=0.95
         )
-        
-        # 验证更新
-        media = await db.get_media_file(media_id)
-        assert media["tags"] == '["nature", "landscape"]'
-        assert media["ai_processed"] is True
+
+        media = await db.fetchone(
+            "SELECT * FROM media_files WHERE id = ?", (media_id,)
+        )
+        assert media["ai_processed"]  # SQLite TRUE 存为 1
+        assert "nature" in media["tags"]
 
     @pytest.mark.asyncio
     async def test_delete_media_file(self, db):
-        """测试删除媒体文件"""
-        # 添加文件
-        media_id = await db.add_media_file(
-            file_path="/test/image.jpg",
-            file_name="image.jpg",
-            file_type="image"
+        """测试软删除媒体文件（原语更新）"""
+        media_id = await db.add_media_file({
+            "file_path": "/test/image.jpg",
+            "file_name": "image.jpg",
+            "file_type": "image"
+        })
+
+        await db.execute(
+            "UPDATE media_files SET is_deleted = TRUE WHERE id = ?",
+            (media_id,)
         )
-        
-        # 软删除
-        await db.delete_media_file(media_id)
-        
-        # 验证删除
-        media = await db.get_media_file(media_id)
-        assert media["is_deleted"] is True
+
+        media = await db.fetchone(
+            "SELECT * FROM media_files WHERE id = ?", (media_id,)
+        )
+        assert media["is_deleted"]  # SQLite TRUE 存为 1
 
     @pytest.mark.asyncio
     async def test_list_media_files(self, db):
-        """测试列出媒体文件"""
-        # 添加多个文件
+        """测试列出媒体文件（原语查询）"""
         for i in range(5):
-            await db.add_media_file(
-                file_path=f"/test/image{i}.jpg",
-                file_name=f"image{i}.jpg",
-                file_type="image"
-            )
-        
-        # 列出文件
-        files = await db.list_media_files(limit=10)
-        
+            await db.add_media_file({
+                "file_path": f"/test/image{i}.jpg",
+                "file_name": f"image{i}.jpg",
+                "file_type": "image"
+            })
+
+        files = await db.fetchall(
+            "SELECT * FROM media_files WHERE is_deleted = FALSE LIMIT ?",
+            (10,)
+        )
+
         assert len(files) == 5
 
     @pytest.mark.asyncio
-    async def test_search_media_by_tags(self, db):
-        """测试按标签搜索"""
-        # 添加带标签的文件
-        await db.add_media_file(
-            file_path="/test/nature.jpg",
-            file_name="nature.jpg",
-            file_type="image",
-            tags='["nature", "landscape"]'
-        )
-        await db.add_media_file(
-            file_path="/test/city.jpg",
-            file_name="city.jpg",
-            file_type="image",
-            tags='["city", "urban"]'
-        )
-        
-        # 搜索
-        results = await db.search_media_by_tags(["nature"])
-        
+    async def test_search_media(self, db):
+        """测试全文检索（FTS）"""
+        await db.add_media_file({
+            "file_path": "/test/nature.jpg",
+            "file_name": "nature.jpg",
+            "file_type": "image"
+        })
+        await db.add_media_file({
+            "file_path": "/test/city.jpg",
+            "file_name": "city.jpg",
+            "file_type": "image"
+        })
+
+        results = await db.search_media("nature")
+
         assert len(results) == 1
         assert results[0]["file_name"] == "nature.jpg"
 
     @pytest.mark.asyncio
     async def test_get_media_count(self, db):
-        """测试获取媒体数量"""
-        # 添加文件
+        """测试获取媒体数量（原语查询）"""
         for i in range(3):
-            await db.add_media_file(
-                file_path=f"/test/image{i}.jpg",
-                file_name=f"image{i}.jpg",
-                file_type="image"
-            )
-        
-        count = await db.get_media_count()
-        
+            await db.add_media_file({
+                "file_path": f"/test/image{i}.jpg",
+                "file_name": f"image{i}.jpg",
+                "file_type": "image"
+            })
+
+        count = await db.fetchval(
+            "SELECT COUNT(*) FROM media_files WHERE is_deleted = FALSE"
+        )
+
         assert count == 3
 
 
@@ -213,7 +208,6 @@ class TestAlbums:
 
     @pytest.fixture
     async def db(self):
-        """创建测试数据库"""
         db = Database(":memory:")
         await db.init()
         yield db
@@ -222,59 +216,33 @@ class TestAlbums:
     @pytest.mark.asyncio
     async def test_create_album(self, db):
         """测试创建相册"""
-        album_id = await db.create_album(
-            name="Test Album",
-            path="/test/album",
-            cover_media_id=None
-        )
-        
+        album_id = await db.create_album("Test Album", "manual")
+
         assert album_id is not None
         assert isinstance(album_id, int)
 
     @pytest.mark.asyncio
-    async def test_get_album(self, db):
-        """测试获取相册"""
-        album_id = await db.create_album(
-            name="Test Album",
-            path="/test/album"
-        )
-        
-        album = await db.get_album(album_id)
-        
-        assert album is not None
-        assert album["name"] == "Test Album"
+    async def test_get_albums(self, db):
+        """测试获取相册（含过滤）"""
+        await db.create_album("Manual Album", "manual")
+        await db.create_album("Smart Album", "smart")
+
+        all_albums = await db.get_albums()
+        assert len(all_albums) == 2
+
+        manual = await db.get_albums(album_type="manual")
+        assert len(manual) == 1
+        assert manual[0]["album_name"] == "Manual Album"
 
     @pytest.mark.asyncio
     async def test_list_albums(self, db):
         """测试列出相册"""
-        # 创建多个相册
         for i in range(3):
-            await db.create_album(
-                name=f"Album {i}",
-                path=f"/test/album{i}"
-            )
-        
-        albums = await db.list_albums()
-        
-        assert len(albums) == 3
+            await db.create_album(f"Album {i}", "manual")
 
-    @pytest.mark.asyncio
-    async def test_add_media_to_album(self, db):
-        """测试添加媒体到相册"""
-        # 创建相册和媒体
-        album_id = await db.create_album(name="Album", path="/test/album")
-        media_id = await db.add_media_file(
-            file_path="/test/image.jpg",
-            file_name="image.jpg",
-            file_type="image"
-        )
-        
-        # 添加到相册
-        await db.add_media_to_album(album_id, media_id)
-        
-        # 验证
-        album = await db.get_album(album_id)
-        assert album["media_count"] == 1
+        albums = await db.get_albums()
+
+        assert len(albums) == 3
 
 
 class TestUsers:
@@ -282,7 +250,6 @@ class TestUsers:
 
     @pytest.fixture
     async def db(self):
-        """创建测试数据库"""
         db = Database(":memory:")
         await db.init()
         yield db
@@ -297,7 +264,7 @@ class TestUsers:
             salt="salt123",
             role="viewer"
         )
-        
+
         assert user_id is not None
 
     @pytest.mark.asyncio
@@ -309,9 +276,9 @@ class TestUsers:
             salt="salt123",
             role="viewer"
         )
-        
+
         user = await db.get_user_by_username("testuser")
-        
+
         assert user is not None
         assert user["username"] == "testuser"
         assert user["role"] == "viewer"
@@ -325,13 +292,9 @@ class TestUsers:
             salt="old_salt",
             role="viewer"
         )
-        
-        await db.update_user_password(
-            "testuser",
-            "new_hash",
-            "new_salt"
-        )
-        
+
+        await db.update_user_password("testuser", "new_hash", "new_salt")
+
         user = await db.get_user_by_username("testuser")
         assert user["hashed_password"] == "new_hash"
 
@@ -344,9 +307,9 @@ class TestUsers:
             salt="salt",
             role="viewer"
         )
-        
+
         await db.update_user_role("testuser", "editor")
-        
+
         user = await db.get_user_by_username("testuser")
         assert user["role"] == "editor"
 
@@ -356,7 +319,6 @@ class TestTasks:
 
     @pytest.fixture
     async def db(self):
-        """创建测试数据库"""
         db = Database(":memory:")
         await db.init()
         yield db
@@ -366,24 +328,29 @@ class TestTasks:
     async def test_create_task(self, db):
         """测试创建任务"""
         task_id = await db.create_task(
+            task_id="task-uuid-1",
             task_type="scan",
-            status="pending",
-            params='{"path": "/test"}'
+            device_id="device-1",
+            params={"path": "/test"}
         )
-        
+
         assert task_id is not None
 
     @pytest.mark.asyncio
     async def test_update_task_status(self, db):
         """测试更新任务状态"""
-        task_id = await db.create_task(
+        await db.create_task(
+            task_id="task-uuid-1",
             task_type="scan",
-            status="pending"
+            device_id="device-1",
+            params={"path": "/test"}
         )
-        
-        await db.update_task_status(task_id, "running")
-        
-        task = await db.get_task(task_id)
+
+        await db.update_task_status("task-uuid-1", "running")
+
+        task = await db.fetchone(
+            "SELECT * FROM tasks WHERE task_id = ?", ("task-uuid-1",)
+        )
         assert task["status"] == "running"
 
 
@@ -395,20 +362,18 @@ class TestIndexes:
         """测试索引已创建"""
         db = Database(":memory:")
         await db.init()
-        
-        # 获取所有索引
+
         indexes = await db.fetchall(
             "SELECT name, tbl_name FROM sqlite_master WHERE type='index'",
             ()
         )
-        
+
         index_names = [idx["name"] for idx in indexes]
-        
-        # 验证重要索引存在
+
         assert any("file_type" in name for name in index_names)
         assert any("taken_at" in name for name in index_names)
         assert any("ai_processed" in name for name in index_names)
-        
+
         await db.close()
 
 

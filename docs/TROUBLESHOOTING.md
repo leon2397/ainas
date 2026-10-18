@@ -32,14 +32,24 @@
 ### 4. 扫描不到文件 / 数量对不上
 
 - **路径写法**：本地运行用宿主机路径（`E:/pic`）；Docker 必须用容器内路径（`/nas`）
-- 格式不在支持列表（见 QUICKSTART.md）
+- 格式不在支持列表（见 QUICKSTART.md；`.ts` 刻意不收，与 TypeScript 歧义）
 - 子目录没勾"递归"
-- 任务页看该次扫描任务的错误信息
+- **先用对账端点定位**（dry-run，不写库）：
+  ```
+  GET /api/media/count/reconcile?path=E:\pic
+  ```
+  - `consistent=true` → 计数与磁盘一致，问题在上层展示
+  - `phantom>0` → 库有盘无（文件在 AINAS 外被删/移），同路径重扫一次即自动软删除、计数回落
+  - `missing>0` → 盘有库无，重扫即自动索入
+  - `revivable>0` → 之前软删除的文件回来了，重扫自动复活
+  - `walk_errors>0` → 目录不可读（权限/外接盘离线），检查挂载
+- 任务页看该次扫描任务的错误信息（`error_files` 明细在任务 result 中）
 
 ### 5. 缩略图慢或不出
 
 - 首次按需生成，大图慢；之后有缓存（`data/thumbnails/`）
 - 原文件被移动/删除 → 缩略图无法生成，重新扫描修复索引
+- 视频缩略图依赖首帧提取（cv2 直接解码，不依赖 ffmpeg）；若仍失败，检查视频文件本身是否损坏
 
 ### 6. 端口 8000 被占用
 
@@ -72,6 +82,9 @@ ss -tlnp | grep 8000
 | 7 | 点任何按钮没反应 | app.js 20+ 个全局委托引用从未 import 的页面单例，每次点击 ReferenceError | 统一 `onPage()` 懒加载委托 |
 | 8 | 仪表盘任务/设备卡片报错 | 元素 ID 不符（`recent-tasks-list` vs HTML 的 `recent-tasks`） | 修正 ID + 渲染函数空值防护 |
 | 9 | 数据不自动更新 | 仪表盘只加载时取数一次，无轮询 | 30s 轮询 + visibilitychange + 手动刷新按钮 |
+| 10 | **视频缩略图全部 500**（WinError 2 系统找不到指定的文件） | 提帧直接 `subprocess ffmpeg`，而 ffmpeg 既不在 Windows PATH 也不在 Docker 镜像里；Windows 直接运行和 Docker 部署两条路都坏 | cv2.VideoCapture 直接解码首帧（opencv 是硬依赖，无需外部二进制），ffmpeg 降级为备选 |
+| 11 | uvicorn 父进程死后 worker 变孤儿继续占端口 | 父进程被 kill 时 worker 不退出，端口不释放、代码更新不生效 | 运维注意：重启前先 `netstat -ano \| findstr 8000` 找 LISTENING PID 杀干净再启动 |
+| 12 | 内存认证模式下改角色/禁用/删除用户静默无效 | `mod_auth/service.py` 的 `update_user_role`/`toggle_user`/`delete_user` 只写了 DB 分支，漏了 fallback 分支（`update_password` 有对照） | 补全 else 分支，操作内存用户表 |
 
 ## 四、报告新问题
 
