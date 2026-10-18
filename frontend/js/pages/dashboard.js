@@ -28,6 +28,33 @@ export class DashboardPage {
 
         } catch (e) {
             console.error('加载仪表盘数据失败:', e);
+        } finally {
+            this.startAutoRefresh();
+        }
+    }
+
+    /**
+     * 启动自动刷新（30 秒轮询 + 切回标签页立即刷新）。
+     * 修复“页面长时间开着，扫描/上传完成后数据不更新”的问题。
+     */
+    startAutoRefresh() {
+        this.stopAutoRefresh();
+        this._refreshTimer = setInterval(() => this.load(), 30000);
+        this._visibilityHandler = () => {
+            if (!document.hidden) this.load();
+        };
+        document.addEventListener('visibilitychange', this._visibilityHandler);
+    }
+
+    /** 离开仪表盘时停止刷新，避免定时器叠加 */
+    stopAutoRefresh() {
+        if (this._refreshTimer) {
+            clearInterval(this._refreshTimer);
+            this._refreshTimer = null;
+        }
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            this._visibilityHandler = null;
         }
     }
 

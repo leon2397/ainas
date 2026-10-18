@@ -224,6 +224,11 @@ class App {
             }
         });
 
+        // 离开仪表盘时停止其自动刷新，避免定时器叠加
+        if (pageName !== 'dashboard' && window.dashboardPage) {
+            window.dashboardPage.stopAutoRefresh();
+        }
+
         // Close mobile sidebar
         if (window.innerWidth <= 767) {
             this.closeSidebar();
