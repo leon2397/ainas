@@ -42,8 +42,8 @@ class ThumbnailCache:
         """获取缩略图路径（如果存在）"""
         cache_path = self._get_cache_path(file_path, size)
         if cache_path.exists():
-            # 更新访问时间
-            cache_path.utime(None)
+            # 更新访问时间（os.utime 同时支持 Windows/POSIX；Path 无 utime 方法）
+            os.utime(cache_path, None)
             return cache_path
         return None
     

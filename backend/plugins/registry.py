@@ -52,14 +52,29 @@ class PluginRegistry:
         # 注册内置插件类型
         from plugins.storage.local_storage import LocalStoragePlugin
         from plugins.storage.ssh_storage import SSHStoragePlugin
-        from plugins.storage.smb_storage import SMBStoragePlugin
-        from plugins.storage.nas_storage import NASStoragePlugin
+        from plugins.storage.smb_storage import SMBStoragePlugin, NASStoragePlugin
+        # 注意：NASStoragePlugin（带 PluginManifest、SMB/CIFS 协议）定义在 smb_storage.py；
+        # nas_storage.py 中的 NasStorage 是 NFS/直挂载变体，类名不同，勿混用
         
         self._builtin_plugins["local"] = LocalStoragePlugin
         self._builtin_plugins["ssh"] = SSHStoragePlugin
         self._builtin_plugins["smb"] = SMBStoragePlugin
         self._builtin_plugins["nas"] = NASStoragePlugin
-        
+
+        # 将内置插件的 manifest 登记到 _manifests（以注册键为键），
+        # 使 get_manifest / list_by_type / 插件详情接口对内置插件生效
+        for plugin_id, plugin_class in self._builtin_plugins.items():
+            get_manifest = getattr(plugin_class, "get_manifest", None)
+            if get_manifest is None:
+                continue
+            try:
+                manifest = get_manifest()
+            except Exception as e:
+                logger.warning(f"Builtin plugin {plugin_id} manifest load failed: {e}")
+                continue
+            if manifest is not None:
+                self._manifests[plugin_id] = manifest
+
         logger.info(f"Loaded {len(self._builtin_plugins)} builtin plugins")
     
     def _load_installed_plugins(self):
@@ -73,9 +88,12 @@ class PluginRegistry:
                     self._manifests[manifest.id] = manifest
     
     def _save_manifests(self):
-        """保存插件清单"""
+        """保存插件清单（仅第三方安装插件，内置插件不落盘）"""
         manifest_file = self.plugins_dir / "manifests.json"
-        data = [m.to_dict() for m in self._manifests.values()]
+        data = [
+            m.to_dict() for pid, m in self._manifests.items()
+            if pid not in self._builtin_plugins
+        ]
         with open(manifest_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     
@@ -117,11 +135,7 @@ class PluginRegistry:
         
         # 内置插件
         for plugin_id, plugin_class in self._builtin_plugins.items():
-            manifest = None
-            for m in self._manifests.values():
-                if m.id == plugin_id:
-                    manifest = m
-                    break
+            manifest = self._manifests.get(plugin_id)
             
             result.append({
                 "id": plugin_id,

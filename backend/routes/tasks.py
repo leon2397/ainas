@@ -3,7 +3,7 @@ Tasks API Routes
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel
 import requests
 import json
@@ -23,7 +23,9 @@ class TaskResponse(BaseModel):
     status: str
     progress: int = 0
     error_msg: Optional[str] = None
-    result: Optional[dict] = None
+    # 注意：历史上 result 列可能存有非 dict 的 JSON（list/标量）或脏文本，
+    # 用 Any 兜底，避免单行脏数据让整个列表接口 500
+    result: Optional[Any] = None
     created_at: Optional[str] = None
     
     class Config:
@@ -62,6 +64,16 @@ async def list_tasks(
     else:
         sql = "SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?"
         tasks = await db.fetchall(sql, (limit,))
+    
+    # DB 中 params/result 为 JSON 字符串，需解析后再交给响应模型校验
+    for task in tasks:
+        for key in ('params', 'result'):
+            value = task.get(key)
+            if isinstance(value, str):
+                try:
+                    task[key] = json.loads(value)
+                except (ValueError, TypeError):
+                    pass  # 脏数据保留原样，由 Optional[Any] 兜底
     
     return tasks
 

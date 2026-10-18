@@ -7,6 +7,7 @@ import os
 import psutil
 from typing import Optional
 from PIL import Image
+from loguru import logger
 
 
 # 内存限制配置
