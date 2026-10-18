@@ -42,7 +42,9 @@ async def favicon():
     """Serve favicon"""
     favicon_file = FRONTEND_PATH / "favicon.ico"
     if not favicon_file.exists():
-        return FileResponse(path=__file__, media_type="text/plain")  # fallback
+        # 安全：绝不能用 __file__ 兜底——那会把本文件源码当 text/plain
+        # 无认证返回（未授权源码泄露）。favicon 缺失时返回 404 即可。
+        raise HTTPException(status_code=404, detail="Not Found")
     return FileResponse(
         path=favicon_file,
         media_type="image/x-icon"
