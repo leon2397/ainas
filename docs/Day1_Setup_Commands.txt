@@ -1,0 +1,17 @@
+# Day 1 Setup Commands (Run in PowerShell/CMD)
+
+# 1. Create Virtual Environment
+cd C:\leon\ai-nas-media-manager\backend
+python -m venv venv
+
+# 2. Activate Virtual Environment
+.\venv\Scripts\activate
+
+# 3. Upgrade pip
+pip install --upgrade pip
+
+# 4. Install Dependencies
+pip install -r requirements.txt
+
+# 5. Test FastAPI
+python -c "from fastapi import FastAPI; print('FastAPI OK')"

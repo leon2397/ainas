@@ -1,0 +1,64 @@
+# Web Server Configuration
+
+# Server settings
+server:
+  host: 0.0.0.0
+  port: 8000
+  debug: false
+  reload: false
+
+# CORS
+cors:
+  origins:
+    - "*"
+  methods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+  allow_credentials: true
+
+# Static files
+static:
+  enabled: true
+  frontend_path: ../frontend
+  favicon: /static/favicon.ico
+
+# WebSocket
+websocket:
+  enabled: true
+  heartbeat_interval: 30
+  max_connections: 100
+  ping_timeout: 10
+
+# JWT Authentication
+auth:
+  enabled: true
+  secret_key: ""  # Set via environment variable AI_NAS_JWT_SECRET
+  token_expire_hours: 24
+  algorithm: HS256
+
+# Session
+session:
+  max_age: 86400
+  cookie_name: ai_nas_session
+
+# Rate limiting
+rate_limit:
+  enabled: false
+  requests_per_minute: 60
+  burst: 10
+
+# Logging
+logging:
+  level: INFO
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+  file: ./logs/web.log
+  max_size_mb: 50
+  backup_count: 5
+
+# API pagination defaults
+pagination:
+  default_page_size: 50
+  max_page_size: 500

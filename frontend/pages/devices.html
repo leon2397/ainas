@@ -1,0 +1,57 @@
+<!-- 设备管理页面模板 -->
+<div class="content-header d-flex justify-content-between align-items-center">
+    <h4><i class="fas fa-microchip me-2"></i>设备管理</h4>
+    <button class="btn btn-primary btn-sm" onclick="showAddDeviceModal()">
+        <i class="fas fa-plus me-1"></i>添加设备
+    </button>
+</div>
+
+<div id="devices-list">
+    <div class="text-center text-muted py-5">
+        <i class="fas fa-microchip fa-3x mb-3"></i>
+        <p>暂无设备</p>
+    </div>
+</div>
+
+<!-- 添加设备弹窗 -->
+<div class="modal fade" id="addDeviceModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加设备</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">设备ID</label>
+                    <input type="text" class="form-control" id="device-id" placeholder="arm-device-001">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">设备名称</label>
+                    <input type="text" class="form-control" id="device-name" placeholder="客厅电视盒子">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">IP 地址</label>
+                    <input type="text" class="form-control" id="device-ip" placeholder="192.168.1.100">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">端口</label>
+                    <input type="number" class="form-control" id="device-port" value="8000">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">NPU 类型</label>
+                    <select class="form-select" id="device-npu">
+                        <option value="rk3588">RK3588</option>
+                        <option value="rk3576">RK3576</option>
+                        <option value="amlogic">Amlogic</option>
+                        <option value="unknown">未知</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="addDevice()">添加</button>
+            </div>
+        </div>
+    </div>
+</div>

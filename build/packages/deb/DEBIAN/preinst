@@ -1,0 +1,33 @@
+#!/bin/bash
+# AIqizhi DEB - preinst
+set -e
+
+case "$1" in
+    install|upgrade)
+        if ! command -v python3 >/dev/null 2>&1; then
+            echo "Error: python3 not found"
+            echo "  Run: apt-get install python3 python3-pip python3-venv"
+            exit 1
+        fi
+
+        PY_VER=$(python3 -c "import sys; print(sys.version_info.major * 100 + sys.version_info.minor)")
+        if [ "$PY_VER" -lt 308 ]; then
+            echo "Error: Python >= 3.8 required, current: $(python3 --version)"
+            exit 1
+        fi
+
+        if ! command -v ffmpeg >/dev/null 2>&1; then
+            echo "Warning: ffmpeg not found, video features unavailable"
+        fi
+
+        if [ "$1" = "upgrade" ] && [ -f /etc/systemd/system/aiqizhi.service ]; then
+            systemctl stop aiqizhi 2>/dev/null || true
+            echo "Service stopped for upgrade"
+        fi
+
+        echo "AIqizhi pre-install check passed"
+        ;;
+    abort-upgrade)
+        ;;
+esac
+exit 0

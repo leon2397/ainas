@@ -1,0 +1,55 @@
+﻿apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-nas-config
+  namespace: ai-nas
+  labels:
+    app.kubernetes.io/name: ai-nas
+    app.kubernetes.io/component: config
+data:
+  # ─── Backend Configuration ───────────────────────────────
+  BACKEND_PORT: "8000"
+  DATABASE_PATH: "/app/data/metadata.db"
+  STORAGE_ORIGINAL_PATH: "/nas/photo_original"
+  STORAGE_ALBUM_PATH: "/nas/photo_album"
+  STORAGE_TEMP_PATH: "/nas/temp"
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRE_HOURS: "24"
+  LOG_LEVEL: "info"
+
+  # ─── ARM Device Configuration ────────────────────────────
+  ARM_DEVICE_ID: "arm-k8s-01"
+  ARM_DEVICE_NAME: "ARM K8s Node 1"
+  ARM_NPU_TYPE: "cpu"
+  ARM_AI_ENGINE: "cpu"
+  ARM_LOG_LEVEL: "info"
+  ARM_WIN_SERVER_HOST: "ai-nas-backend"
+  ARM_WIN_SERVER_PORT: "8000"
+
+  # ─── Config Files (embedded) ─────────────────────────────
+  arm-config.yaml: |
+    device:
+      id: "arm-k8s-01"
+      name: "ARM K8s Node 1"
+      npu_type: cpu
+    server:
+      host: 0.0.0.0
+      port: 8000
+    ai:
+      engine: cpu
+      confidence_threshold: 0.5
+      max_concurrent_tasks: 2
+    windows_server:
+      host: ai-nas-backend
+      port: 8000
+      sync_interval: 30
+    discovery:
+      enabled: false
+      port: 9000
+      broadcast_interval: 60
+    paths:
+      nas_root: /nas
+      models_dir: /app/models
+    limits:
+      max_upload_size_mb: 100
+      thumbnail_size: 256

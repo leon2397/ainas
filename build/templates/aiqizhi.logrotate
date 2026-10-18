@@ -1,0 +1,13 @@
+/var/log/aiqizhi/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 aiqizhi aiqizhi
+    sharedscripts
+    postrotate
+        systemctl kill -s USR1 aiqizhi.service 2>/dev/null || true
+    endscript
+}

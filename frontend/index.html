@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-NAS Media Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="login-overlay" style="display: flex;">
+        <div class="login-card">
+            <h3><i class="fas fa-cloud"></i>AI-NAS 媒体库</h3>
+            <form id="login-form">
+                <div class="mb-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                        <input type="text" id="login-username" class="form-control" placeholder="用户名" required>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                        <input type="password" id="login-password" class="form-control" placeholder="密码" required>
+                    </div>
+                </div>
+                <div id="login-error" class="alert alert-danger py-2" style="display: none;"></div>
+                <button type="submit" id="login-btn" class="btn btn-primary w-100 py-3">
+                    <span id="login-text">登录系统</span>
+                    <span id="login-spinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>
+                </button>
+            </form>
+            <div class="text-center mt-4 pt-3 border-top">
+                <small class="text-muted">默认账号: admin / admin123</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-brand">
+            <i class="fas fa-cloud"></i><span>AI-NAS</span>
+        </div>
+        <div class="sidebar-nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+            <i class="fas fa-th-large"></i>仪表盘
+        </div>
+        <div class="sidebar-nav-item" data-page="media" onclick="showPage('media')">
+            <i class="fas fa-photo-video"></i>媒体库
+        </div>
+        <div class="sidebar-nav-item" data-page="albums" onclick="showPage('albums')">
+            <i class="fas fa-folder-open"></i>相册
+        </div>
+        <div class="sidebar-nav-item" data-page="devices" id="nav-devices" onclick="showPage('devices')">
+            <i class="fas fa-microchip"></i>设备
+        </div>
+        <div class="sidebar-nav-item" data-page="tasks" id="nav-tasks" onclick="showPage('tasks')">
+            <i class="fas fa-tasks"></i>任务
+        </div>
+        <div class="sidebar-nav-item" data-page="ai" id="nav-ai" onclick="showPage('ai')">
+            <i class="fas fa-robot"></i>AI功能
+        </div>
+        <div class="sidebar-nav-item" data-page="cloud" id="nav-cloud" onclick="showPage('cloud')">
+            <i class="fas fa-cloud"></i>云存储
+        </div>
+        <div class="sidebar-nav-item" data-page="plugins" id="nav-plugins" onclick="showPage('plugins')">
+            <i class="fas fa-puzzle-piece"></i>插件管理
+        </div>
+        <div class="sidebar-nav-item" data-page="enterprise" id="nav-enterprise" onclick="showPage('enterprise')" style="display:none">
+            <i class="fas fa-building"></i>企业设置
+        </div>
+        <div class="sidebar-nav-item" data-page="mobile" id="nav-mobile" onclick="showPage('mobile')">
+            <i class="fas fa-mobile-alt"></i>移动同步
+        </div>
+        <div class="sidebar-nav-item" data-page="users" id="nav-users" onclick="showPage('users')">
+            <i class="fas fa-users"></i>用户
+        </div>
+        <div class="sidebar-nav-item" data-page="audit" id="nav-audit" onclick="showPage('audit')" style="display: none;">
+            <i class="fas fa-history"></i>审计日志
+        </div>
+        <div class="sidebar-nav-item" data-page="settings" id="nav-settings" onclick="showPage('settings')">
+            <i class="fas fa-cog"></i>设置
+        </div>
+    </nav>
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+    <!-- Mobile Menu Button -->
+    <button class="hamburger-btn" onclick="toggleSidebar()">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Plugin Page -->
+    <section id="page-plugins" class="page" style="display: none;">
+        <div id="plugin-content">
+            <!-- Content loaded by JS -->
+        </div>
+    </section>
+
+    <!-- Enterprise Page -->
+    <section id="page-enterprise" class="page" style="display: none;">
+        <div id="enterprise-content">
+            <!-- Content loaded by JS -->
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Page -->
+        <section id="page-dashboard" class="page">
+            <div class="content-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0"><i class="fas fa-th-large me-2"></i>仪表盘</h4>
+                <button class="btn btn-sm btn-outline-secondary" onclick="app.logout()">
+                    <i class="fas fa-sign-out-alt"></i> 退出
+                </button>
+            </div>
+            <div class="row mb-4">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="stat-card" onclick="filterMediaType('image')">
+                        <i class="fas fa-image"></i>
+                        <div class="stat-number" id="stat-images">0</div>
+                        <div>图片</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="stat-card" onclick="filterMediaType('video')">
+                        <i class="fas fa-video"></i>
+                        <div class="stat-number" id="stat-videos">0</div>
+                        <div>视频</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="stat-card" onclick="showPage('albums')">
+                        <i class="fas fa-folder"></i>
+                        <div class="stat-number" id="stat-albums">0</div>
+                        <div>相册</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="stat-card" onclick="showPage('devices')">
+                        <i class="fas fa-server"></i>
+                        <div class="stat-number" id="stat-devices">0</div>
+                        <div>在线设备</div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <div class="card p-3">
+                        <h6><i class="fas fa-clock me-2"></i>最近任务</h6>
+                        <div id="recent-tasks"></div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <div class="card p-3">
+                        <h6><i class="fas fa-server me-2"></i>设备状态</h6>
+                        <div id="device-status-list"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Media Page -->
+        <section id="page-media" class="page" style="display: none;">
+            <div class="content-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h4 class="mb-0"><i class="fas fa-photo-video me-2"></i>媒体库</h4>
+                    <div>
+                        <select id="media-type-filter" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="mediaPage.load()">
+                            <option value="">全部类型</option>
+                            <option value="image">图片</option>
+                            <option value="video">视频</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-primary" onclick="toggleAdvancedSearch()">
+                            <i class="fas fa-search"></i> 高级
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleBatchMode()">
+                            <i class="fas fa-check-square"></i> 批量
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="advanced-search-panel" class="advanced-search-panel" style="display: none;">
+                <div class="row g-2">
+                    <div class="col-md-3"><input type="text" id="adv-keyword" class="form-control form-control-sm" placeholder="关键词"></div>
+                    <div class="col-md-2"><select id="adv-file-type" class="form-select form-select-sm"><option value="">全部类型</option><option value="image">图片</option><option value="video">视频</option></select></div>
+                    <div class="col-md-3"><input type="text" id="adv-tags" class="form-control form-control-sm" placeholder="标签(逗号分隔)"></div>
+                    <div class="col-md-2"><input type="date" id="adv-date-from" class="form-control form-control-sm"></div>
+                    <div class="col-md-2"><input type="date" id="adv-date-to" class="form-control form-control-sm"></div>
+                </div>
+                <div class="mt-2 text-end">
+                    <button class="btn btn-sm btn-primary" onclick="performAdvancedSearch()">搜索</button>
+                    <button class="btn btn-sm btn-secondary" onclick="toggleAdvancedSearch()">收起</button>
+                </div>
+            </div>
+            <div id="batch-toolbar" class="d-none mb-3 p-2 bg-light rounded">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <span>已选 <span id="selected-count">0</span> 项</span>
+                        <button class="btn btn-sm btn-link" onclick="selectAllVisible()">全选</button>
+                        <button class="btn btn-sm btn-link" onclick="exitBatchMode()">取消</button>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-primary" onclick="showBatchTagModal()"><i class="fas fa-tags"></i> 加标签 <span id="batch-tag-count" class="badge bg-light text-dark">0</span></button>
+                        <button class="btn btn-sm btn-info" onclick="showAddToAlbumModal()"><i class="fas fa-folder-plus"></i> 加入相册</button>
+                        <button class="btn btn-sm btn-danger" onclick="batchDelete()"><i class="fas fa-trash"></i> 删除</button>
+                    </div>
+                </div>
+            </div>
+            <div id="media-grid" class="media-grid"></div>
+            <div id="media-loading" class="loading" style="display: none;"><div class="spinner"></div></div>
+            <div id="media-empty" class="text-center text-muted py-5" style="display: none;"><i class="fas fa-folder-open fa-3x"></i><p>暂无媒体文件</p></div>
+            <div class="text-center mt-3">
+                <button id="load-more-btn" class="btn btn-outline-primary" style="display: none;" onclick="loadMoreMedia()">加载更多</button>
+            </div>
+        </section>
+
+        <!-- Albums Page -->
+        <section id="page-albums" class="page" style="display: none;">
+            <div class="content-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0"><i class="fas fa-folder-open me-2"></i>相册</h4>
+                <div>
+                    <select id="album-sort" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="loadAlbums()">
+                        <option value="name_asc">名称↑</option>
+                        <option value="name_desc">名称↓</option>
+                        <option value="date_desc">最新</option>
+                        <option value="count_desc">最多</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" onclick="showCreateAlbumModal()"><i class="fas fa-plus"></i> 新建</button>
+                </div>
+            </div>
+            <div id="albums-grid" class="row albums-grid"></div>
+        </section>
+
+        <!-- Devices Page -->
+        <section id="page-devices" class="page" style="display: none;">
+            <div class="content-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0"><i class="fas fa-microchip me-2"></i>设备管理</h4>
+                <button class="btn btn-sm btn-primary" onclick="showAddDeviceModal()"><i class="fas fa-plus"></i> 添加设备</button>
+            </div>
+            <div id="devices-list"></div>
+        </section>
+
+        <!-- Tasks Page -->
+        <section id="page-tasks" class="page" style="display: none;">
+            <div class="content-header">
+                <h4 class="mb-0"><i class="fas fa-tasks me-2"></i>任务管理</h4>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>ID</th><th>类型</th><th>设备</th><th>状态</th><th>进度</th><th>创建时间</th><th>操作</th></tr></thead>
+                    <tbody id="tasks-table-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- AI Page -->
+        <section id="page-ai" class="page" style="display: none;">
+            <div class="content-header">
+                <h4 class="mb-0"><i class="fas fa-robot me-2"></i>AI功能</h4>
+            </div>
+            
+            <!-- Tabs -->
+            <div id="ai-tabs" class="mb-4"></div>
+            
+            <!-- Content -->
+            <div id="ai-content">
+                <div class="text-center text-muted py-5">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-3">加载中...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Cloud Storage Page -->
+        <section id="page-cloud" class="page" style="display: none;">
+            <div class="content-header">
+                <h4 class="mb-0"><i class="fas fa-cloud me-2"></i>云存储</h4>
+            </div>
+            
+            <!-- Tabs -->
+            <div id="cloud-tabs" class="mb-4"></div>
+            
+            <!-- Content -->
+            <div id="cloud-content">
+                <div class="text-center text-muted py-5">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-3">加载中...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mobile Sync Page -->
+        <section id="page-mobile" class="page" style="display: none;">
+            <div class="content-header">
+                <h4 class="mb-0"><i class="fas fa-mobile-alt me-2"></i>移动同步</h4>
+            </div>
+            
+            <!-- Tabs -->
+            <div id="mobile-tabs" class="mb-4"></div>
+            
+            <!-- Content -->
+            <div id="mobile-content">
+                <div class="text-center text-muted py-5">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-3">加载中...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Users Page -->
+        <section id="page-users" class="page" style="display: none;">
+            <div class="content-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0"><i class="fas fa-users me-2"></i>用户管理</h4>
+                <button class="btn btn-sm btn-primary" onclick="showCreateUserModal()"><i class="fas fa-user-plus"></i> 添加用户</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody id="users-table-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Settings Page -->
+        <section id="page-settings" class="page" style="display: none;">
+            <div class="content-header">
+                <h4 class="mb-0"><i class="fas fa-cog me-2"></i>设置</h4>
+            </div>
+            <div id="settings-content">
+                <!-- Settings content loaded by settings.js module -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Connection Status -->
+    <div id="connection-status" class="connection-status disconnected">
+        <i class="fas fa-wifi me-1"></i> 未连接
+    </div>
+
+    <!-- Media Detail Modal -->
+    <div class="modal fade" id="mediaDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="media-detail-title">媒体详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-7">
+                            <img id="media-detail-img" class="modal-detail-img w-100 rounded">
+                        </div>
+                        <div class="col-md-5 detail-sidebar">
+                            <p><small class="text-muted">文件名</small><br><span id="media-detail-name">-</span></p>
+                            <p><small class="text-muted">大小</small><br><span id="media-detail-size">-</span></p>
+                            <p><small class="text-muted">拍摄时间</small><br><span id="media-detail-date">-</span></p>
+                            <p><small class="text-muted">AI分析</small><br><span id="media-detail-ai">-</span></p>
+                            <p><small class="text-muted">标签</small></p>
+                            <div id="media-detail-tags" class="mb-2"></div>
+                            <div class="input-group input-group-sm">
+                                <input type="text" id="new-tag-input" class="form-control" placeholder="输入标签，回车添加">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-primary" onclick="runAIClassify()"><i class="fas fa-robot"></i> AI分析</button>
+                    <button class="btn btn-outline-primary" onclick="downloadMedia()"><i class="fas fa-download"></i> 下载</button>
+                    <button class="btn btn-outline-danger" onclick="deleteCurrentMedia()"><i class="fas fa-trash"></i> 删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Tag Modal -->
+    <div class="modal fade" id="batchTagModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">批量添加标签</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="batch-tags-input" class="form-control" placeholder="标签1, 标签2, 标签3">
+                    <small class="text-muted">多个标签用逗号分隔</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="batchAddTags()">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Album Modal -->
+    <div class="modal fade" id="createAlbumModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新建相册</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">相册名称</label>
+                        <input type="text" id="album-name" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">类型</label>
+                        <select id="album-type" class="form-select">
+                            <option value="custom">自定义</option>
+                            <option value="ai">AI智能</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="createAlbum()">创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add to Album Modal -->
+    <div class="modal fade" id="addToAlbumModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加到相册</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="create-new-album-check">
+                        <label class="form-check-label" for="create-new-album-check">创建新相册</label>
+                    </div>
+                    <div id="new-album-input" style="display: none;" class="mb-3">
+                        <input type="text" id="new-album-name" class="form-control" placeholder="新相册名称">
+                    </div>
+                    <div class="mb-3">
+                        <select id="target-album-id" class="form-select">
+                            <option value="">选择相册...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="addToAlbum()">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Device Modal -->
+    <div class="modal fade" id="addDeviceModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加设备</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2"><input type="text" id="device-id" class="form-control" placeholder="设备ID"></div>
+                    <div class="mb-2"><input type="text" id="device-name" class="form-control" placeholder="设备名称"></div>
+                    <div class="mb-2"><input type="text" id="device-ip" class="form-control" placeholder="IP地址"></div>
+                    <div class="mb-2"><input type="number" id="device-port" class="form-control" value="8000" placeholder="端口"></div>
+                    <div class="mb-2"><input type="text" id="device-npu" class="form-control" placeholder="NPU类型(可选)"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="addDevice()">添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create User Modal -->
+    <div class="modal fade" id="createUserModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2"><input type="text" id="new-username" class="form-control" placeholder="用户名"></div>
+                    <div class="mb-2"><input type="password" id="new-password" class="form-control" placeholder="密码(至少6位)"></div>
+                    <div class="mb-2"><select id="new-user-role" class="form-select"><option value="viewer">访客</option><option value="editor">编辑者</option><option value="admin">管理员</option></select></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="createUser()">创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Log Page -->
+    <section id="page-audit" class="page" style="display: none;">
+        <div class="content-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0"><i class="fas fa-history me-2"></i>审计日志</h4>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary me-2" onclick="auditPage.exportLogs('csv')">
+                    <i class="fas fa-download"></i> 导出CSV
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="auditPage.exportLogs('json')">
+                    <i class="fas fa-download"></i> 导出JSON
+                </button>
+            </div>
+        </div>
+        
+        <!-- Statistics -->
+        <div id="audit-stats" class="mb-4"></div>
+        
+        <!-- Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <select id="filter-level" class="form-select form-select-sm">
+                            <option value="">所有级别</option>
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                            <option value="CRITICAL">CRITICAL</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select id="filter-category" class="form-select form-select-sm">
+                            <option value="">所有类别</option>
+                            <option value="AUTH">认证</option>
+                            <option value="USER">用户</option>
+                            <option value="MEDIA">媒体</option>
+                            <option value="ALBUM">相册</option>
+                            <option value="DEVICE">设备</option>
+                            <option value="SYSTEM">系统</option>
+                            <option value="CONFIG">配置</option>
+                            <option value="SECURITY">安全</option>
+                            <option value="ADMIN">管理</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="filter-username" class="form-control form-control-sm" placeholder="用户名">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" id="filter-start-date" class="form-control form-control-sm" placeholder="开始日期">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" id="filter-end-date" class="form-control form-control-sm" placeholder="结束日期">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-sm btn-primary me-1" onclick="auditPage.applyFilters()">
+                            <i class="fas fa-search"></i> 筛选
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="auditPage.resetFilters()">
+                            <i class="fas fa-undo"></i> 重置
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Log Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>时间</th>
+                                <th>级别</th>
+                                <th>类别</th>
+                                <th>用户</th>
+                                <th>操作</th>
+                                <th>详情</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-table-body">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        <div id="audit-pagination" class="mt-4"></div>
+    </section>
+
+    <!-- Audit Log Detail Modal -->
+    <div class="modal fade" id="audit-detail-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">日志详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>时间：</strong><span id="detail-timestamp">-</span></p>
+                            <p><strong>级别：</strong><span id="detail-level">-</span></p>
+                            <p><strong>类别：</strong><span id="detail-category">-</span></p>
+                            <p><strong>用户：</strong><span id="detail-username">-</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>IP地址：</strong><span id="detail-ip">-</span></p>
+                            <p><strong>操作：</strong><span id="detail-action">-</span></p>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <strong>User Agent：</strong>
+                        <pre class="bg-light p-2 rounded small" id="detail-user-agent">-</pre>
+                    </div>
+                    <div class="mb-3">
+                        <strong>请求数据：</strong>
+                        <pre class="bg-light p-2 rounded small" id="detail-request">-</pre>
+                    </div>
+                    <div>
+                        <strong>响应数据：</strong>
+                        <pre class="bg-light p-2 rounded small" id="detail-response">-</pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">修改密码</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2"><input type="password" id="old-password" class="form-control" placeholder="当前密码"></div>
+                    <div class="mb-2"><input type="password" id="new-password-change" class="form-control" placeholder="新密码(至少6位)"></div>
+                    <div class="mb-2"><input type="password" id="confirm-password" class="form-control" placeholder="确认新密码"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="changePassword()">确认修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plugin Dialog (for config) -->
+    <div class="modal fade" id="plugin-dialog" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content" id="plugin-dialog-content">
+                <!-- Content filled by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="css/plugins.css" rel="stylesheet">
+    <link href="css/enterprise.css" rel="stylesheet">
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

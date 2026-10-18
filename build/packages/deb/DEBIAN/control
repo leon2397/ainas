@@ -1,0 +1,15 @@
+Package: aiqizhi
+Version: 2.0.0
+Section: utils
+Priority: optional
+Architecture: @ARCH@
+Installed-Size: @SIZE@
+Maintainer: AIqizhi Team
+Homepage: https://github.com/aiqizhi/ai-nas-media-manager
+Description: AIqizhi - AI-powered NAS Media Management System
+ AIqizhi is an intelligent media management system for
+ NAS devices and Linux servers. Features AI classification,
+ face recognition, multi-device management, web & mobile UI.
+Depends: python3 (>= 3.8), python3-pip, python3-venv, ffmpeg
+Recommends: python3-pil, tesseract-ocr
+Suggests: nvidia-cuda-toolkit

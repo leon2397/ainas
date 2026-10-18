@@ -1,0 +1,13 @@
+#!/bin/bash
+# AIqizhi DEB - prerm
+set -e
+
+case "$1" in
+    remove|deconfigure|upgrade)
+        if [ -f /etc/systemd/system/aiqizhi.service ]; then
+            systemctl stop aiqizhi 2>/dev/null || true
+            echo "AIqizhi service stopped"
+        fi
+        ;;
+esac
+exit 0

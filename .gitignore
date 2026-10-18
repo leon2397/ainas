@@ -1,0 +1,41 @@
+# 敏感配置与密钥
+.env
+*.key
+*.pem
+!*.example
+
+# 运行时数据与日志（保留目录结构）
+backend/data/*
+!backend/data/**/
+!backend/data/**/.gitkeep
+backend/logs/*
+!backend/logs/**/
+!backend/logs/**/.gitkeep
+nas/
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+venv-test/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+
+# 构建产物
+*.deb
+*.rpm
+*.zip
+dist/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini

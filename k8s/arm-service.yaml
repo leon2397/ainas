@@ -1,0 +1,75 @@
+﻿# ==============================================================================
+#  AI-NAS ARM NodePort Service (External Access)
+#  Exposes ARM devices for external connections or Windows backend callback
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-nas-arm-nodeport
+  namespace: ai-nas
+  labels:
+    app.kubernetes.io/name: ai-nas-arm
+    app.kubernetes.io/component: arm-device
+    app.kubernetes.io/exposure: external
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      nodePort: 30001
+      protocol: TCP
+  selector:
+    app: ai-nas-arm
+---
+# ==============================================================================
+#  AI-NAS Backend Ingress (HTTP)
+#  Requires ingress controller (nginx/traefik)
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-nas-backend-ingress
+  namespace: ai-nas
+  labels:
+    app.kubernetes.io/name: ai-nas-backend
+    app.kubernetes.io/component: ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ai-nas.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-nas-backend
+                port:
+                  number: 8000
+---
+# ==============================================================================
+#  API Gateway Service (optional)
+#  If using a separate API gateway / load balancer
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-nas-api-gateway
+  namespace: ai-nas
+  labels:
+    app.kubernetes.io/name: ai-nas-api-gateway
+    app.kubernetes.io/component: gateway
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: ai-nas-backend

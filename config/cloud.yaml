@@ -1,0 +1,20 @@
+# Cloud Backup Configuration
+# 云备份配置（按需填写，不配置则云备份功能不可用）
+
+# 阿里云 OSS
+# aliyun:
+#   provider: aliyun
+#   bucket: your-bucket-name
+#   access_key: ""
+#   secret_key: ""
+#   endpoint: https://oss-cn-hangzhou.aliyuncs.com
+#   prefix: ai-nas/
+
+# 腾讯云 COS
+# tencent:
+#   provider: tencent
+#   bucket: your-bucket-1234567890
+#   access_key: ""
+#   secret_key: ""
+#   region: ap-guangzhou
+#   prefix: ai-nas/

@@ -1,0 +1,149 @@
+#!/bin/bash
+# AIqizhi DEB - postinst
+set -e
+
+INSTALL_DIR="/opt/aiqizhi"
+DATA_DIR="/var/lib/aiqizhi"
+LOG_DIR="/var/log/aiqizhi"
+CONFIG_DIR="/etc/aiqizhi"
+VENV_DIR="$INSTALL_DIR/backend/venv"
+SVC_USER="aiqizhi"
+
+case "$1" in
+    configure)
+        echo "=== AIqizhi Post-Install Configuration ==="
+
+        # Step 1: Create system user
+        if ! id "$SVC_USER" >/dev/null 2>&1; then
+            useradd --system --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin                 --comment "AIqizhi Media Manager" "$SVC_USER"
+            echo "  [1/8] Created system user: $SVC_USER"
+        else
+            echo "  [1/8] System user $SVC_USER exists"
+        fi
+
+        # Step 2: Create directories
+        mkdir -p "$DATA_DIR/media" "$DATA_DIR/thumbnails" "$DATA_DIR/database"
+        mkdir -p "$LOG_DIR" "$CONFIG_DIR"
+        echo "  [2/8] Directories created"
+
+        # Step 3: Create Python venv
+        echo "  [3/8] Creating Python venv (may take a few minutes)..."
+        if [ ! -d "$VENV_DIR" ]; then
+            python3 -m venv "$VENV_DIR"
+        fi
+
+        # Step 4: Install Python dependencies
+        echo "  [4/8] Installing Python dependencies..."
+        if [ -f "$INSTALL_DIR/backend/requirements.txt" ]; then
+            "$VENV_DIR/bin/pip" install --no-cache-dir --quiet                 -r "$INSTALL_DIR/backend/requirements.txt" 2>/dev/null || {
+                echo "  Warning: Full deps failed, trying minimal..."
+                if [ -f "$INSTALL_DIR/backend/requirements-min.txt" ]; then
+                    "$VENV_DIR/bin/pip" install --no-cache-dir --quiet                         -r "$INSTALL_DIR/backend/requirements-min.txt" 2>/dev/null || true
+                fi
+            }
+            echo "  [4/8] Python deps installed"
+        fi
+
+        # Step 5: Initialize database + admin
+        echo "  [5/8] Initializing database..."
+        cd "$INSTALL_DIR/backend"
+        ADMIN_PASS=$("$VENV_DIR/bin/python" -c "
+import sys, secrets, string
+sys.path.insert(0, '.')
+try:
+    from database.db import Database
+    from core.auth import AuthManager
+    db = Database()
+    db.init_tables()
+    auth = AuthManager()
+    pw = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+    auth.create_user('admin', pw, 'admin')
+    print(pw)
+except Exception:
+    pw = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+    print(pw)
+") || { ADMIN_PASS=$(head -c 48 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 16); }
+
+        echo "admin:$ADMIN_PASS" > "$CONFIG_DIR/.admin_password"
+        _PERM_CMD="chmod 600 $CONFIG_DIR/.admin_password"
+        $_PERM_CMD
+        echo "  [5/8] Database initialized"
+
+        # Step 6: Generate default config
+        echo "  [6/8] Generating config..."
+        if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
+            SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "0.0.0.0")
+            JWT_SECRET=$("$VENV_DIR/bin/python" -c "import secrets; print(secrets.token_hex(32))")
+            cat > "$CONFIG_DIR/config.yaml" << YAMLEOF
+server:
+  host: "0.0.0.0"
+  port: 18000
+  workers: 2
+database:
+  path: "$DATA_DIR/database/aiqizhi.db"
+media:
+  base_path: "$DATA_DIR/media"
+  thumbnail_path: "$DATA_DIR/thumbnails"
+  max_upload_size: 5368709120
+auth:
+  jwt_secret: "$JWT_SECRET"
+  token_expire_hours: 72
+logging:
+  level: "INFO"
+  file: "$LOG_DIR/aiqizhi.log"
+  max_size: 52428800
+  backup_count: 5
+YAMLEOF
+            echo "  [6/8] Config generated"
+        else
+            echo "  [6/8] Config exists, keeping"
+        fi
+
+        # Step 7: Set ownership and permissions
+        echo "  [7/8] Setting permissions..."
+        _OWN_CMD="chown -R $SVC_USER:$SVC_USER $INSTALL_DIR $DATA_DIR $LOG_DIR $CONFIG_DIR"
+        $_OWN_CMD
+        _DIR_PERM="chmod 755 $INSTALL_DIR"
+        $_DIR_PERM
+        _CFG_PERM="chmod 700 $CONFIG_DIR"
+        $_CFG_PERM
+        echo "  [7/8] Permissions set"
+
+        # Step 8: Start service
+        echo "  [8/8] Starting service..."
+        systemctl daemon-reload
+        systemctl enable aiqizhi
+        systemctl start aiqizhi
+
+        # Show install summary
+        SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "YOUR_SERVER_IP")
+        sleep 2
+        SVC_STATUS=$(systemctl is-active aiqizhi 2>/dev/null || echo "unknown")
+
+        echo ""
+        echo "======================================================"
+        echo "     AIqizhi Media Manager - Install Complete"
+        echo "======================================================"
+        echo ""
+        echo "  URL:      http://${SERVER_IP}:18000"
+        echo "  Username: admin"
+        echo "  Password: ${ADMIN_PASS}"
+        echo "  Saved to: ${CONFIG_DIR}/.admin_password"
+        echo ""
+        echo "  Status:   ${SVC_STATUS}"
+        echo "  Logs:     journalctl -u aiqizhi -f"
+        echo ""
+        echo "  Commands:"
+        echo "    start:   systemctl start aiqizhi"
+        echo "    stop:    systemctl stop aiqizhi"
+        echo "    restart: systemctl restart aiqizhi"
+        echo "    status:  systemctl status aiqizhi"
+        echo "======================================================"
+        echo ""
+        echo "!! Save your password and change it after first login !!"
+        echo ""
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+esac
+exit 0

@@ -1,0 +1,89 @@
+# ==============================================================================
+#  AI-NAS Media Manager - Docker Compose
+#
+#  使用方法：
+#    1. 复制 .env.example 为 .env 并修改配置
+#    2. 创建 NAS_PATH 目录（存放媒体文件）
+#    3. docker compose up -d
+#    4. 浏览器访问 http://localhost:8000
+#
+#  管理命令：
+#    docker compose logs -f        # 查看日志
+#    docker compose restart        # 重启服务
+#    docker compose down           # 停止服务
+#    docker compose up -d --build  # 重新构建并启动
+# ==============================================================================
+
+services:
+  # ==========================================================================
+  #  AI-NAS 应用服务（FastAPI + 前端）
+  # ==========================================================================
+  app:
+    image: ainasi/ai-nas:latest
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ai-nas
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      # JWT 认证 - 生产环境请在 .env 中设置
+      - AI_NAS_JWT_SECRET=${AI_NAS_JWT_SECRET:-}
+      - AI_NAS_TOKEN_EXPIRE_HOURS=${AI_NAS_TOKEN_EXPIRE_HOURS:-24}
+      # CORS 跨域 - 多个域名用逗号或空格分隔
+      - AI_NAS_CORS_ORIGINS=${AI_NAS_CORS_ORIGINS:-}
+      # 日志级别
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # 存储路径
+      - NAS_PATH=/nas
+    volumes:
+      # 数据持久化 - 挂载到宿主机，防止重启丢失
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # 配置文件
+      - ./config:/app/config:ro
+      # 媒体文件 - 挂载你的 NAS 目录
+      - ${NAS_PATH:-./nas}:/nas
+    networks:
+      - ai-nas-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: ${BACKEND_MEM_LIMIT:-1G}
+          cpus: "${BACKEND_CPU_LIMIT:-1.0}"
+
+  # ==========================================================================
+  #  Watchtower - 自动更新容器
+  # ==========================================================================
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: ai-nas-watchtower
+    restart: unless-stopped
+    environment:
+      - WATCHTOWER_SCHEDULE=0 0 4 * * *  # 每天凌晨 4 点检查更新
+      - WATCHTOWER_CLEANUP=true          # 自动删除旧镜像
+      - WATCHTOWER_INCLUDE_STOPPED=false # 不监控已停止的容器
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - ai-nas-net
+    profiles:
+      - auto-update  # 需要自动更新时添加：docker compose --profile auto-update up -d
+
+# ==============================================================================
+#  Networks
+# ==============================================================================
+networks:
+  ai-nas-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

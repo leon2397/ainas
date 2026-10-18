@@ -1,0 +1,54 @@
+<!-- 仪表盘页面模板 -->
+<div class="content-header">
+    <h4><i class="fas fa-tachometer-alt me-2"></i>仪表盘</h4>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3 col-6 mb-3">
+        <div class="stat-card" onclick="showPage('media'); filterMediaType('image');">
+            <i class="fas fa-image"></i>
+            <div class="stat-number" id="stat-images">0</div>
+            <div class="text-muted">图片</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="stat-card" onclick="showPage('media'); filterMediaType('video');">
+            <i class="fas fa-video"></i>
+            <div class="stat-number" id="stat-videos">0</div>
+            <div class="text-muted">视频</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="stat-card" onclick="showPage('albums');">
+            <i class="fas fa-folder-open"></i>
+            <div class="stat-number" id="stat-albums">0</div>
+            <div class="text-muted">相册</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="stat-card" onclick="showPage('devices');">
+            <i class="fas fa-microchip"></i>
+            <div class="stat-number" id="stat-devices">0</div>
+            <div class="text-muted">在线设备</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card p-3">
+            <h6 class="mb-3"><i class="fas fa-clock me-2"></i>最近任务</h6>
+            <div id="recent-tasks">
+                <div class="text-muted text-center py-3">暂无任务</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card p-3">
+            <h6 class="mb-3"><i class="fas fa-microchip me-2"></i>设备状态</h6>
+            <div id="device-status-list">
+                <div class="text-muted text-center py-3">暂无在线设备</div>
+            </div>
+        </div>
+    </div>
+</div>

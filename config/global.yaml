@@ -1,0 +1,14 @@
+database:
+  path: ./data/metadata.db
+debug: false
+log_level: INFO
+scheduler:
+  max_workers: 4
+  retry_delay: 5
+  retry_times: 3
+server:
+  host: AI-NAS-Test-v2
+storage:
+  album_path: ./nas/photo_album
+  original_path: ./nas/photo_original
+  temp_path: ./nas/temp

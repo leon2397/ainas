@@ -1,0 +1,23 @@
+# ARM Devices Configuration
+devices:
+  - device_id: arm-bm1688-01
+    name: BM1688 Device 01
+    ip: 192.168.1.100
+    port: 8000
+    username: pi
+    password: ""
+    npu_type: bm1688
+    ai_plugin: plugins/ai/bm1688_engine.py
+    storage_plugin: plugins/storage/ssh_storage.py
+    status: offline
+    
+  - device_id: arm-rockchip-01
+    name: Rockchip Device 01
+    ip: 192.168.1.101
+    port: 8000
+    username: pi
+    password: ""
+    npu_type: rockchip
+    ai_plugin: plugins/ai/rockchip_engine.py
+    storage_plugin: plugins/storage/smb_storage.py
+    status: offline

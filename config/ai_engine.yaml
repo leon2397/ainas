@@ -1,0 +1,24 @@
+# AI Engine Configuration
+models:
+  image_classification:
+    model_path: models/image_model.onnx
+    input_size: [224, 224]
+    threshold: 0.5
+    batch_size: 8
+    
+  face_detection:
+    model_path: models/face_model.onnx
+    input_size: [640, 640]
+    threshold: 0.7
+    
+  video_analysis:
+    model_path: models/video_model.onnx
+    input_size: [224, 224]
+    threshold: 0.5
+    scene_threshold: 0.3
+    
+# CPU Fallback (when NPU unavailable)
+cpu_fallback:
+  enabled: true
+  model: mobilenet_v3_small
+  device: cpu

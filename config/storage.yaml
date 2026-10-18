@@ -1,0 +1,61 @@
+# Storage Configuration
+
+# Storage paths
+paths:
+  original_path: ./nas/photo_original
+  album_path: ./nas/photo_album
+  temp_path: ./nas/temp
+  thumbnail_path: ./nas/.thumbnails
+  log_path: ./nas/index/logs
+
+# Default storage backend
+default_backend: local  # local | ssh | smb | nas
+
+# Local storage
+local:
+  base_path: ./data
+
+# NAS direct mount storage
+nas:
+  base_path: /nas
+  mount_point: /nas
+  max_concurrent_ops: 4
+  mount_check_interval: 300  # seconds
+
+# SSH storage (for remote ARM devices)
+ssh:
+  default_timeout: 30
+  connect_timeout: 10
+
+# SMB storage (Windows share)
+smb:
+  default_port: 445
+  timeout: 30
+
+# Cloud storage (backup)
+cloud:
+  provider: ""  # aliyun_oss | tencent_cos | aws_s3
+  bucket: ""
+  region: ""
+  endpoint: ""
+
+# Archive settings
+archive:
+  date_format: "%Y/%m/%d"
+  preserve_original: true
+  copy_before_move: true
+
+# Thumbnail settings
+thumbnail:
+  default_size: [200, 200]
+  sizes:
+    - [200, 200]    # thumbnail
+    - [400, 400]    # small preview
+    - [800, 600]    # medium preview
+  quality: 85
+  cache_enabled: true
+
+# Disk space warning
+disk_warning:
+  min_free_gb: 5
+  check_interval: 300

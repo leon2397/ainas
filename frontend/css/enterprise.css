@@ -1,0 +1,209 @@
+/* frontend/css/enterprise.css - 企业设置页面样式 */
+
+/* ============ Enterprise Page Layout ============ */
+.enterprise-page {
+  padding: 0;
+  min-height: 100vh;
+  background: var(--bg-color, #f5f7fa);
+}
+
+/* ============ Header ============ */
+.enterprise-header {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+  padding: 32px 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.enterprise-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.enterprise-header p {
+  margin: 8px 0 0;
+  opacity: 0.9;
+  font-size: 14px;
+}
+
+/* ============ Tabs ============ */
+.enterprise-tabs {
+  background: white;
+  padding: 0 24px;
+  border-bottom: 1px solid #e0e0e0;
+  margin: 0;
+}
+
+.enterprise-tabs .nav-link {
+  color: #666;
+  padding: 16px 24px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.enterprise-tabs .nav-link:hover {
+  color: #11998e;
+  border-color: transparent;
+}
+
+.enterprise-tabs .nav-link.active {
+  color: #11998e;
+  border-color: #11998e;
+  background: transparent;
+}
+
+/* ============ Tab Content ============ */
+.tab-content {
+  padding: 24px;
+}
+
+.tab-content-inner {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============ Cards ============ */
+.enterprise-page .card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.enterprise-page .card-header {
+  background: white;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 20px;
+}
+
+/* ============ Stat Boxes ============ */
+.stat-box {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s;
+}
+
+.stat-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-box.warning {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+}
+
+.stat-box.success {
+  background: linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%);
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* ============ Level Bars ============ */
+.level-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.level-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.level-label {
+  width: 80px;
+  font-size: 13px;
+  color: #666;
+}
+
+.level-bar {
+  flex: 1;
+  height: 24px;
+  background: #f0f0f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.level-bar-fill {
+  height: 100%;
+  border-radius: 12px;
+  transition: width 0.5s ease;
+}
+
+.level-info { background: #e3f2fd; }
+.level-warning { background: #fff3e0; }
+.level-error, .level-critical { background: #ffebee; }
+
+.level-count {
+  width: 50px;
+  text-align: right;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ============ SSO Config Sections ============ */
+.sso-config-section {
+  animation: fadeIn 0.3s ease;
+}
+
+/* ============ Alerts ============ */
+.enterprise-page .alert {
+  border: none;
+  border-radius: 8px;
+}
+
+/* ============ Badges ============ */
+.badge {
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+/* ============ Responsive ============ */
+@media (max-width: 768px) {
+  .enterprise-header {
+    padding: 20px 16px;
+  }
+  
+  .enterprise-header h1 {
+    font-size: 22px;
+  }
+  
+  .enterprise-tabs {
+    padding: 0 16px;
+    overflow-x: auto;
+  }
+  
+  .enterprise-tabs .nav-link {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+  
+  .tab-content {
+    padding: 16px;
+  }
+  
+  .stat-box {
+    margin-bottom: 12px;
+  }
+}

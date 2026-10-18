@@ -1,0 +1,33 @@
+[Unit]
+Description=AIqizhi Intelligent Media Management System
+Documentation=https://github.com/aiqizhi/ai-nas-media-manager
+After=network-online.target network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aiqizhi
+Group=aiqizhi
+EnvironmentFile=-/etc/aiqizhi/aiqizhi.conf
+WorkingDirectory=/opt/aiqizhi/backend
+ExecStart=/opt/aiqizhi/backend/venv/bin/python -m uvicorn main:app     --host 0.0.0.0     --port 18000     --workers 2     --log-level info     --access-log
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=60
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aiqizhi
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/aiqizhi /var/log/aiqizhi /opt/aiqizhi/data /opt/aiqizhi/backend/data
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+Alias=aiqizhi.service

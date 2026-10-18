@@ -1,0 +1,74 @@
+<!-- 设置页面模板 -->
+<div class="content-header">
+    <h4><i class="fas fa-cog me-2"></i>系统设置</h4>
+</div>
+
+<div class="card p-3 mb-3">
+    <h6>存储设置</h6>
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">NAS 挂载路径</label>
+            <input type="text" class="form-control" id="nas-path" placeholder="/mnt/nas">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">缩略图缓存大小 (MB)</label>
+            <input type="number" class="form-control" id="thumb-cache-size" value="500">
+        </div>
+    </div>
+</div>
+
+<div class="card p-3 mb-3">
+    <h6>AI 设置</h6>
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">默认 AI 模型</label>
+            <select class="form-select" id="ai-model">
+                <option value="resnet50">ResNet50</option>
+                <option value="mobilenet">MobileNet</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">置信度阈值</label>
+            <input type="range" class="form-range" id="confidence-threshold" min="0" max="100" value="60">
+            <small class="text-muted">当前: <span id="confidence-value">60</span>%</small>
+        </div>
+    </div>
+</div>
+
+<div class="card p-3">
+    <h6>账户设置</h6>
+    <p class="text-muted small">当前用户: <strong id="current-username">-</strong> (<span id="current-role">-</span>)</p>
+    <button class="btn btn-outline-primary btn-sm" onclick="showChangePasswordModal()">
+        <i class="fas fa-key me-1"></i>修改密码
+    </button>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">修改密码</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">当前密码</label>
+                    <input type="password" class="form-control" id="old-password">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">新密码</label>
+                    <input type="password" class="form-control" id="new-password-change">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">确认新密码</label>
+                    <input type="password" class="form-control" id="confirm-password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="changePassword()">修改</button>
+            </div>
+        </div>
+    </div>
+</div>

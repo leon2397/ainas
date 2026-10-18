@@ -1,0 +1,70 @@
+﻿# ==============================================================================
+#  AI-NAS Media Manager - Docker Ignore
+# ==============================================================================
+
+# Version control
+.git
+.gitignore
+
+# Python virtual environments
+backend/venv/
+arm/venv/
+**/venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Data and runtime (use volumes instead)
+backend/data/
+backend/logs/
+**/data/original/
+**/data/albums/
+**/data/thumbnails/
+**/data/chroma/
+**/data/uploads/
+
+# NAS mount point
+/nas/
+
+# Backup files
+backup_*/
+*.bak
+
+# Documentation (not needed in container)
+docs/
+*.md
+*.docx
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+test_*.py
+**/tests/
+
+# Docker files (avoid recursive copy)
+docker-compose*.yml
+.dockerignore
+
+# Misc
+*.bat
+*.ps1
+before-edit.bat
+Day1_Setup_Commands.txt
+Git*.bat
+Windows*.bat
+*.bat
+backup-manager.ps1
+check-env.py
+syntax_check.py

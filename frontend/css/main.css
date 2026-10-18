@@ -1,0 +1,39 @@
+/* AI-NAS Media Manager - Main Styles Import */
+/* Core styles are now in style.css - this file is for additional overrides */
+
+:root {
+    --primary-color: #4361ee;
+    --success-color: #06d6a0;
+    --danger-color: #ef476f;
+    --warning-color: #ffd166;
+    --info-color: #118ab2;
+}
+
+/* Legacy overrides for compatibility */
+.stat-card .stat-number { font-size: 2rem; font-weight: bold; }
+.media-item-checkbox { position: absolute; top: 8px; left: 8px; z-index: 10; opacity: 0; transition: opacity 0.2s; }
+.media-grid.batch-mode .media-item-checkbox { opacity: 1; }
+.media-grid.batch-mode .media-item { cursor: pointer; }
+.media-item.selected { outline: 3px solid var(--primary-color); outline-offset: -3px; }
+.album-cover { width: 100%; height: 120px; object-fit: cover; border-radius: 8px 8px 0 0; background: #eee; }
+.album-card { border-radius: 10px; overflow: hidden; cursor: pointer; transition: transform 0.2s; }
+.album-card:hover { transform: translateY(-3px); }
+.advanced-search-panel { background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.detail-sidebar { max-height: 70vh; overflow-y: auto; }
+
+/* Additional polish */
+.table-hover tbody tr:hover { background-color: rgba(67, 97, 238, 0.05); }
+.form-control:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15); }
+.btn { border-radius: 8px; font-weight: 500; transition: all 0.2s; }
+.btn:hover { transform: translateY(-1px); }
+.dropdown-menu { border-radius: 12px; border: none; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+.dropdown-item { padding: 10px 20px; border-radius: 8px; margin: 2px 8px; }
+.dropdown-item:hover { background-color: rgba(67, 97, 238, 0.1); }
+.badge { padding: 6px 12px; border-radius: 20px; font-weight: 500; }
+.progress { border-radius: 10px; height: 8px; }
+.nav-tabs { border-bottom: 2px solid #e9ecef; }
+.nav-tabs .nav-link { border: none; padding: 12px 20px; color: #636e72; font-weight: 500; }
+.nav-tabs .nav-link:hover { color: var(--primary-color); }
+.nav-tabs .nav-link.active { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); }
+.alert { border-radius: 12px; border: none; }
+.list-group-item { border-radius: 8px; margin-bottom: 8px; border: 1px solid #e9ecef; }

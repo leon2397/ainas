@@ -1,0 +1,41 @@
+#!/bin/bash
+# AIqizhi DEB - postrm
+set -e
+
+case "$1" in
+    purge)
+        # Remove system user
+        if id aiqizhi >/dev/null 2>&1; then
+            userdel aiqizhi 2>/dev/null || true
+            echo "System user removed"
+        fi
+
+        # Remove data directory
+        if [ -d /var/lib/aiqizhi ]; then
+            rm -rf /var/lib/aiqizhi
+            echo "Data directory removed"
+        fi
+
+        # Remove log directory
+        if [ -d /var/log/aiqizhi ]; then
+            rm -rf /var/log/aiqizhi
+            echo "Log directory removed"
+        fi
+
+        # Remove config directory
+        if [ -d /etc/aiqizhi ]; then
+            rm -rf /etc/aiqizhi
+            echo "Config directory removed"
+        fi
+
+        # Remove systemd files
+        rm -f /etc/systemd/system/aiqizhi.service
+        rm -f /etc/logrotate.d/aiqizhi
+        systemctl daemon-reload
+        echo "Systemd files removed"
+        ;;
+    remove)
+        systemctl daemon-reload 2>/dev/null || true
+        ;;
+esac
+exit 0
