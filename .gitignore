@@ -5,6 +5,8 @@
 !*.example
 
 # 运行时数据与日志（保留目录结构）
+logs/
+data/
 backend/data/*
 !backend/data/**/
 !backend/data/**/.gitkeep
