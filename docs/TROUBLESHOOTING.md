@@ -86,6 +86,16 @@ ss -tlnp | grep 8000
 | 11 | uvicorn 父进程死后 worker 变孤儿继续占端口 | 父进程被 kill 时 worker 不退出，端口不释放、代码更新不生效 | 运维注意：重启前先 `netstat -ano \| findstr 8000` 找 LISTENING PID 杀干净再启动 |
 | 12 | 内存认证模式下改角色/禁用/删除用户静默无效 | `mod_auth/service.py` 的 `update_user_role`/`toggle_user`/`delete_user` 只写了 DB 分支，漏了 fallback 分支（`update_password` 有对照） | 补全 else 分支，操作内存用户表 |
 | 13 | **`/favicon.ico` 无认证泄露源码**（4,180 B frontend.py） | favicon 文件缺失时路由以 `__file__` 兜底返回 text/plain；浏览器自动请求 favicon，用户无感知 | 缺失返回 404；已生成 `frontend/favicon.ico` |
+| 14 | **`/api/tasks/` 500，worker 崩溃连带服务退出**（仪表盘"最近任务"瘫痪） | `list_tasks` 直接返回 DB 原始行，`result` 列是 JSON 字符串，与 `TaskResponse.result: Optional[dict]` 不符触发 `ResponseValidationError`；同文件 `get_task` 有解析、列表漏了 | 列表接口解析 `params`/`result` JSON 字段；`result` 模型放宽 `Optional[Any]` 兜底脏数据（提交 38c068c） |
+| 15 | **`/api/plugins/*` 全部 500** | `registry._load_builtin_plugins` 从 `plugins.storage.nas_storage` 导入 `NASStoragePlugin`，但该类实际叫 `NasStorage`（带 manifest 的 `NASStoragePlugin` 在 `smb_storage.py`）→ ImportError 在 registry 构造时抛出 | 改从 `smb_storage` 导入；内置插件 manifest 登记进 `_manifests`（详情/驱动列表恢复）；`_save_manifests` 排除内置项 |
+| 16 | **缩略图第二次请求必 500**（Windows） | `thumbnail_cache.get()` 调用 `Path.utime()`——`WindowsPath` 没有 `utime` 方法，缓存命中即 AttributeError；首次冒烟只请求一次所以未暴露 | 改用 `os.utime(cache_path, None)`（跨平台） |
+| 17 | 图片加载失败时 NameError 而非返回 None | `memory_guard.safe_load_image` 的 except 分支引用未导入的 `logger` | 补 `from loguru import logger` |
+
+### 已知待修：测试套件状态污染（P2）
+
+全量跑 `pytest` 时有 4 个失败：`test_api.py::TestMigrations`（2 个）+ `test_auth.py::TestJWTToken`（2 个）。
+单独跑这两个文件全部通过 → 是套件间的状态污染（JWT secret 经 `data/.env` 持久化后被其他用例改写；
+migrations 子进程受先置 DB 状态影响），非产品代码缺陷。修法：给这两个用例加 secret/DB 隔离 fixture。
 
 ## 四、报告新问题
 
