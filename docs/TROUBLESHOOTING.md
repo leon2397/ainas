@@ -85,6 +85,7 @@ ss -tlnp | grep 8000
 | 10 | **视频缩略图全部 500**（WinError 2 系统找不到指定的文件） | 提帧直接 `subprocess ffmpeg`，而 ffmpeg 既不在 Windows PATH 也不在 Docker 镜像里；Windows 直接运行和 Docker 部署两条路都坏 | cv2.VideoCapture 直接解码首帧（opencv 是硬依赖，无需外部二进制），ffmpeg 降级为备选 |
 | 11 | uvicorn 父进程死后 worker 变孤儿继续占端口 | 父进程被 kill 时 worker 不退出，端口不释放、代码更新不生效 | 运维注意：重启前先 `netstat -ano \| findstr 8000` 找 LISTENING PID 杀干净再启动 |
 | 12 | 内存认证模式下改角色/禁用/删除用户静默无效 | `mod_auth/service.py` 的 `update_user_role`/`toggle_user`/`delete_user` 只写了 DB 分支，漏了 fallback 分支（`update_password` 有对照） | 补全 else 分支，操作内存用户表 |
+| 13 | **`/favicon.ico` 无认证泄露源码**（4,180 B frontend.py） | favicon 文件缺失时路由以 `__file__` 兜底返回 text/plain；浏览器自动请求 favicon，用户无感知 | 缺失返回 404；已生成 `frontend/favicon.ico` |
 
 ## 四、报告新问题
 
