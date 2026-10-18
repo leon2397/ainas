@@ -355,9 +355,16 @@ class Database:
 
     async def update_task_status(self, task_id: str, status: str,
                                   progress: Optional[int] = None,
-                                  error_msg: Optional[str] = None) -> None:
-        """更新任务状态"""
-        if progress is not None:
+                                  error_msg: Optional[str] = None,
+                                  result: Optional[str] = None) -> None:
+        """更新任务状态。result 为 JSON 字符串（扫描统计等），写入即完结。"""
+        if result is not None:
+            await self.execute(
+                """UPDATE tasks SET status = ?, result = ?, progress = 100,
+                   finished_at = CURRENT_TIMESTAMP WHERE task_id = ?""",
+                (status, result, task_id)
+            )
+        elif progress is not None:
             await self.execute(
                 "UPDATE tasks SET status = ?, progress = ? WHERE task_id = ?",
                 (status, progress, task_id)

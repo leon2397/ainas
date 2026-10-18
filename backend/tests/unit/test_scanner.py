@@ -7,6 +7,10 @@ test_scanner.py - 媒体扫描模块单元测试
   3. 增量扫描
   4. 进度回调
   5. 错误处理
+  6. 消失文件自动软删除（计数准确性核心机制）
+  7. 扩展名大小写归一与新格式识别
+  8. 扫描统计口径（new/updated/unchanged）
+  9. 对账预览（reconcile dry-run）
 
 运行：
   cd backend
@@ -30,7 +34,7 @@ backend_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_root))
 
 from database.db import Database
-from services.scanner import MediaScanner, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+from modules.mod_media.scanner import MediaScanner, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 
 
 class TestMediaExtensions:
@@ -147,8 +151,8 @@ class TestMediaScannerFiles:
             
             result = await scanner.scan_directory(tmpdir)
             
-            assert result["total"] == 4  # 4 个媒体文件
-            assert result["images"] == 4
+            assert result["total"] == 6  # 6 个媒体文件（txt 被排除）
+            assert result["images"] == 6
             assert result["videos"] == 0
 
     @pytest.mark.asyncio
@@ -356,6 +360,271 @@ class TestMediaScannerErrorHandling:
         assert "error" in result or result["errors"] > 0
         
         await db.close()
+
+
+class TestVanishedFileCleanup:
+    """磁盘消失文件自动软删除（计数准确性核心机制）"""
+
+    @pytest.fixture
+    async def scanner(self):
+        db = Database(":memory:")
+        await db.init()
+        scanner = MediaScanner(db)
+        yield scanner
+        await db.close()
+
+    @pytest.mark.asyncio
+    async def test_removed_file_soft_deleted(self, scanner):
+        """库有盘无的记录重扫时被软删除，计数回落"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f1 = Path(tmpdir, "a.jpg")
+            f2 = Path(tmpdir, "b.jpg")
+            f1.touch()
+            f2.touch()
+            await scanner.scan_directory(tmpdir)
+            assert await scanner.db.fetchval(
+                "SELECT COUNT(*) FROM media_files WHERE is_deleted=FALSE") == 2
+
+            f2.unlink()  # 模拟用户在 AINAS 之外删除文件
+            stats = await scanner.scan_directory(tmpdir)
+
+            assert stats['removed'] == 1
+            assert stats['unchanged'] == 1
+            assert stats['new'] == 0
+            row = await scanner.db.fetchone(
+                "SELECT is_deleted FROM media_files WHERE file_path = ?",
+                (str(f2),))
+            assert row['is_deleted']
+            # 软删除而非物理删除：记录仍在，可恢复
+            assert await scanner.db.fetchval(
+                "SELECT COUNT(*) FROM media_files") == 2
+
+    @pytest.mark.asyncio
+    async def test_reappeared_file_resurrected(self, scanner):
+        """被软删除的文件重新出现在磁盘上，重扫后复活重新计数"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f1 = Path(tmpdir, "a.jpg")
+            f1.touch()
+            await scanner.scan_directory(tmpdir)
+            f1.unlink()
+            await scanner.scan_directory(tmpdir)
+            assert await scanner.db.fetchval(
+                "SELECT COUNT(*) FROM media_files WHERE is_deleted=FALSE") == 0
+
+            f1.touch()  # 文件回来了
+            stats = await scanner.scan_directory(tmpdir)
+            assert stats['updated'] == 1
+            assert await scanner.db.fetchval(
+                "SELECT COUNT(*) FROM media_files WHERE is_deleted=FALSE") == 1
+
+    @pytest.mark.asyncio
+    async def test_non_recursive_scan_keeps_subdir_entries(self, scanner):
+        """非递归扫描不得把子目录里的现存记录误判为消失"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "a.jpg").touch()
+            subdir = Path(tmpdir, "sub")
+            subdir.mkdir()
+            Path(subdir, "b.jpg").touch()
+            await scanner.scan_directory(tmpdir, recursive=True)
+
+            stats = await scanner.scan_directory(tmpdir, recursive=False)
+            assert stats['removed'] == 0
+            assert await scanner.db.fetchval(
+                "SELECT COUNT(*) FROM media_files WHERE is_deleted=FALSE") == 2
+
+    @pytest.mark.asyncio
+    async def test_custom_extension_scan_keeps_other_types(self, scanner):
+        """自定义扩展名扫描不得软删除其他类型的历史记录"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "a.jpg").touch()
+            Path(tmpdir, "b.mp4").touch()
+            await scanner.scan_directory(tmpdir)
+
+            stats = await scanner.scan_directory(tmpdir, extensions={'.jpg'})
+            assert stats['removed'] == 0
+            assert stats['total'] == 1
+            assert await scanner.db.fetchval(
+                "SELECT COUNT(*) FROM media_files WHERE is_deleted=FALSE") == 2
+
+    @pytest.mark.asyncio
+    async def test_removal_scoped_to_root(self, scanner):
+        """扫描子目录不影响根目录其他记录"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "a.jpg").touch()
+            subdir = Path(tmpdir, "sub")
+            subdir.mkdir()
+            Path(subdir, "b.jpg").touch()
+            await scanner.scan_directory(tmpdir, recursive=True)
+
+            stats = await scanner.scan_directory(str(subdir), recursive=True)
+            assert stats['removed'] == 0
+            assert stats['unchanged'] == 1
+            assert await scanner.db.fetchval(
+                "SELECT COUNT(*) FROM media_files WHERE is_deleted=FALSE") == 2
+
+
+class TestCaseInsensitiveExtensions:
+    """扩展名大小写归一与新格式识别"""
+
+    @pytest.fixture
+    async def scanner(self):
+        db = Database(":memory:")
+        await db.init()
+        scanner = MediaScanner(db)
+        yield scanner
+        await db.close()
+
+    @pytest.mark.asyncio
+    async def test_mixed_case_extension_indexed(self, scanner):
+        """`.Jpg` 混合大小写扩展名必须被索引（Linux 大小写敏感）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "photo.Jpg").touch()
+            result = await scanner.scan_directory(tmpdir)
+            assert result['total'] == 1
+            assert result['images'] == 1
+
+    @pytest.mark.asyncio
+    async def test_uppercase_extension_indexed(self, scanner):
+        """`.JPG` 全大写扩展名必须被索引"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "photo.JPG").touch()
+            result = await scanner.scan_directory(tmpdir)
+            assert result['total'] == 1
+            assert result['images'] == 1
+
+    @pytest.mark.asyncio
+    async def test_new_formats_indexed(self, scanner):
+        """.avif 计为图片，.mts/.rmvb 计为视频"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "a.avif").touch()
+            Path(tmpdir, "b.mts").touch()
+            Path(tmpdir, "c.rmvb").touch()
+            result = await scanner.scan_directory(tmpdir)
+            assert result['total'] == 3
+            assert result['images'] == 1
+            assert result['videos'] == 2
+
+    @pytest.mark.asyncio
+    async def test_ts_not_indexed(self, scanner):
+        """.ts 与 TypeScript 源码歧义，刻意不收（见 scanner 模块注释）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "code.ts").touch()
+            result = await scanner.scan_directory(tmpdir)
+            assert result['total'] == 0
+
+
+class TestScanStatistics:
+    """扫描统计口径：new/updated/unchanged 各自独立且诚实"""
+
+    @pytest.fixture
+    async def scanner(self):
+        db = Database(":memory:")
+        await db.init()
+        scanner = MediaScanner(db)
+        yield scanner
+        await db.close()
+
+    @pytest.mark.asyncio
+    async def test_unchanged_on_rescan(self, scanner):
+        """无变化重扫：全部计为 unchanged，不得虚报 updated"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "a.jpg").touch()
+            Path(tmpdir, "b.mp4").touch()
+            await scanner.scan_directory(tmpdir)
+            stats = await scanner.scan_directory(tmpdir)
+            assert stats['new'] == 0
+            assert stats['updated'] == 0
+            assert stats['unchanged'] == 2
+            assert stats['removed'] == 0
+
+    @pytest.mark.asyncio
+    async def test_updated_on_size_change(self, scanner):
+        """文件体积变化才计为 updated"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Path(tmpdir, "a.jpg")
+            f.write_bytes(b"x")
+            await scanner.scan_directory(tmpdir)
+            f.write_bytes(b"xy")
+            stats = await scanner.scan_directory(tmpdir)
+            assert stats['updated'] == 1
+            assert stats['unchanged'] == 0
+
+    @pytest.mark.asyncio
+    async def test_total_equals_images_videos_errors(self, scanner):
+        """total = images + videos + errors，口径一致"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "a.jpg").touch()
+            Path(tmpdir, "b.mp4").touch()
+            Path(tmpdir, "c.txt").touch()
+            stats = await scanner.scan_directory(tmpdir)
+            assert stats['total'] == stats['images'] + stats['videos'] + stats['errors']
+            assert stats['total'] == 2
+
+
+class TestReconcile:
+    """对账预览：不写库，准确报告 DB 与磁盘差异"""
+
+    @pytest.fixture
+    async def scanner(self):
+        db = Database(":memory:")
+        await db.init()
+        scanner = MediaScanner(db)
+        yield scanner
+        await db.close()
+
+    @pytest.mark.asyncio
+    async def test_reconcile_consistent(self, scanner):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "a.jpg").touch()
+            Path(tmpdir, "b.mp4").touch()
+            await scanner.scan_directory(tmpdir)
+            r = await scanner.reconcile(tmpdir)
+            assert r['consistent'] is True
+            assert r['diff'] == {'phantom': 0, 'missing': 0,
+                                 'revivable': 0, 'type_mismatch': 0}
+            assert r['disk']['total'] == 2
+            assert r['db']['total'] == 2
+
+    @pytest.mark.asyncio
+    async def test_reconcile_detects_phantom(self, scanner):
+        """文件消失后对账报 phantom，且不写库"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f1 = Path(tmpdir, "a.jpg")
+            f1.touch()
+            await scanner.scan_directory(tmpdir)
+            f1.unlink()
+            r = await scanner.reconcile(tmpdir)
+            assert r['consistent'] is False
+            assert r['diff']['phantom'] == 1
+            # dry-run：数据库未被修改
+            assert await scanner.db.fetchval(
+                "SELECT COUNT(*) FROM media_files WHERE is_deleted=FALSE") == 1
+
+    @pytest.mark.asyncio
+    async def test_reconcile_detects_missing(self, scanner):
+        """扫描后新增的文件对账报 missing"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "a.jpg").touch()
+            await scanner.scan_directory(tmpdir)
+            Path(tmpdir, "b.jpg").touch()  # 未重扫
+            r = await scanner.reconcile(tmpdir)
+            assert r['consistent'] is False
+            assert r['diff']['missing'] == 1
+
+    @pytest.mark.asyncio
+    async def test_reconcile_detects_revivable(self, scanner):
+        """软删除后文件回归，对账报 revivable（计数此时偏少）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f1 = Path(tmpdir, "a.jpg")
+            f1.touch()
+            await scanner.scan_directory(tmpdir)
+            f1.unlink()
+            await scanner.scan_directory(tmpdir)  # 软删除
+            f1.touch()  # 文件回来但未重扫
+            r = await scanner.reconcile(tmpdir)
+            assert r['consistent'] is False
+            assert r['diff']['revivable'] == 1
+            assert r['db']['soft_deleted'] == 1
 
 
 if __name__ == "__main__":

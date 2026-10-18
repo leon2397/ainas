@@ -70,12 +70,22 @@ ainas/
 ### 媒体扫描入库（核心链路）
 
 ```
-用户点击「扫描目录」(POST /api/actions/scan {path, recursive})
-  → MediaScanner 遍历目录
-  → 每个文件：计算快速哈希 → 提取 EXIF → 写入 data/metadata.db
+用户点击「扫描目录」(POST /api/actions/scan {path, recursive, file_type})
+  → MediaScanner 单次 os.walk 全树遍历（后缀统一小写比较，Linux 安全）
+  → 逐文件：比对 file_size → 新文件提取 EXIF/GPS 写入 data/metadata.db
+  → 对账清理：扫描范围内、磁盘上已消失的记录自动软删除（is_deleted=TRUE，可恢复）
   → 返回 task_id，前端轮询 /api/tasks/{id} 直到 success
-  → 增量语义：已存在文件按哈希比对，只更新不重复插入
+  → 任务 result 回传统计：new / updated / unchanged / removed / errors
+  → 计数对账（dry-run）：GET /api/media/count/reconcile?path=...
 ```
+
+设计要点（计数准确性，2026-10-18 加固）：
+
+- **单次遍历**：早期实现按扩展名逐个 rglob（26 扩展名 × 大小写 = 52 次全树遍历），已改为一次 `os.walk`
+- **消失文件自动软删除**：只增不删会导致计数永久虚高；软删除可逆，绝不负物理删除行
+- **清理范围隔离**：仅处理本次扫描根目录之内、且后缀落在本次允许范围内的记录；非递归扫描不执行清理（避免误判子目录现存文件）；上传目录/其他盘不受影响
+- **`.ts` 刻意排除**：与 TypeScript 源码歧义，扫到代码目录会误索引为视频；如有需求可通过 `scan_directory(extensions={...})` 显式指定
+- **增量语义**：`file_size` 一致且未被软删除 → `unchanged`（不刷新 `updated_at`）；体积变化或软删除记录重新出现 → `updated`（复活）
 
 ### 缩略图（按需生成）
 

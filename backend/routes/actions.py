@@ -6,6 +6,7 @@ High-level operations: scan, classify, deduplicate
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Optional
+import json
 
 from database.db import Database, get_db
 from services.scanner import MediaScanner, get_scanner
@@ -81,9 +82,16 @@ async def start_scan(
         scanner = await get_scanner(db)
         result = await scanner.scan_directory(
             root_path=request.path,
-            recursive=request.recursive
+            recursive=request.recursive,
+            file_type=request.file_type,
         )
-        await db.update_task_status(task_id, "success", progress=100)
+        if 'error' in result:
+            await db.update_task_status(task_id, "failed",
+                                        error_msg=result['error'])
+        else:
+            await db.update_task_status(
+                task_id, "success", progress=100,
+                result=json.dumps(result, ensure_ascii=False))
         return result
     
     background_tasks.add_task(run_scan)
@@ -104,9 +112,13 @@ async def sync_scan(
     scanner = await get_scanner(db)
     result = await scanner.scan_directory(
         root_path=request.path,
-        recursive=request.recursive
+        recursive=request.recursive,
+        file_type=request.file_type,
     )
-    
+
+    if 'error' in result:
+        raise HTTPException(status_code=400, detail=result['error'])
+
     return {
         "status": "completed",
         "result": result

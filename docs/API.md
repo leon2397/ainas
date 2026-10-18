@@ -94,6 +94,44 @@ Body:
 DELETE /api/media/{file_id}
 ```
 
+### 素材计数（按类型）
+```
+GET /api/media/count/by-type
+```
+Response:
+```json
+{"images": 8418, "videos": 244}
+```
+> 仅统计 `is_deleted=FALSE` 的记录。重扫时磁盘上已消失的记录会被自动软删除，计数随之回落。
+
+### 素材计数对账
+```
+GET /api/media/count/reconcile?path=E:\pic&recursive=true&file_type=
+```
+Query 参数与 `POST /api/actions/scan` 一致（path 必填）。**dry-run，不写库。**
+
+Response：
+```json
+{
+  "root": "E:\\pic",
+  "disk": {"total": 8662, "images": 8418, "videos": 244},
+  "db":   {"total": 8662, "images": 8418, "videos": 244, "soft_deleted": 0},
+  "diff": {"phantom": 0, "missing": 0, "revivable": 0, "type_mismatch": 0},
+  "consistent": true,
+  "samples": {"phantom": [], "missing": [], "revivable": [], "type_mismatch": []},
+  "walk_errors": 0
+}
+```
+
+| diff 字段 | 含义 | 重扫后的行为 |
+|-----------|------|--------------|
+| `phantom` | 库里有、磁盘没了 | 自动软删除（可恢复） |
+| `missing` | 磁盘有、库里没有 | 自动索引 |
+| `revivable` | 磁盘有、库里记录被软删除 | 自动复活，重新计数 |
+| `type_mismatch` | 同路径但 `file_type` 与扩展名不符 | 自动修正 |
+
+`consistent=true` 表示 `count/by-type` 与磁盘实际一致；为 `false` 时执行一次同 path 扫描即可自动修正。
+
 ---
 
 ## 相册 API `/api/albums`
@@ -246,9 +284,21 @@ Body:
 ```json
 {
   "path": "C:\\Users\\Pictures",
-  "recursive": true
+  "recursive": true,
+  "file_type": null
 }
 ```
+> `file_type` 可选 `image` / `video` / `null`（全部），在扩展名白名单基础上再过滤。
+
+任务完成后，`GET /api/tasks/{task_id}` 的 `result` 字段回传本次扫描统计：
+```json
+{
+  "total": 8662, "images": 8418, "videos": 244,
+  "new": 0, "updated": 0, "unchanged": 8662, "removed": 0,
+  "errors": 0, "walk_errors": 0, "error_files": []
+}
+```
+> `total = images + videos + errors`。`removed` 为本次自动软删除的失效记录数（磁盘上已消失的文件），详见「素材计数对账」。
 
 ### AI 分类
 ```

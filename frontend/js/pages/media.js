@@ -367,7 +367,16 @@ export class MediaPage {
             if (task.status === 'success' || task.status === 'failed') {
                 btn.disabled = false;
                 if (task.status === 'success') {
-                    statusEl.textContent = '扫描完成，媒体库已刷新';
+                    const r = task.result;
+                    if (r && typeof r === 'object' && 'total' in r) {
+                        statusEl.textContent =
+                            `扫描完成：共 ${r.total} 个文件（图片 ${r.images} / 视频 ${r.videos}），` +
+                            `新增 ${r.new}，更新 ${r.updated}，未变化 ${r.unchanged}` +
+                            (r.removed ? `，清理失效记录 ${r.removed}` : '') +
+                            (r.errors ? `，失败 ${r.errors}` : '');
+                    } else {
+                        statusEl.textContent = '扫描完成，媒体库已刷新';
+                    }
                     showToast('扫描完成', 'success');
                     await this.load();
                 } else {

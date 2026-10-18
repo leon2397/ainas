@@ -23,6 +23,7 @@ class TaskResponse(BaseModel):
     status: str
     progress: int = 0
     error_msg: Optional[str] = None
+    result: Optional[dict] = None
     created_at: Optional[str] = None
     
     class Config:
