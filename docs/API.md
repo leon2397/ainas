@@ -1,3 +1,11 @@
+# AINAS API 文档
+
+> 版本：v1.0.0 | 更新日期：2026-10-18
+> **运行时为准**：本文是人工维护的参考；接口如有变动，以运行中的 `/openapi.json` 与 `/docs`（Swagger UI）输出为准。
+> 当前规模：197 个 API 路径（101 GET + 96 POST）。
+
+---
+
 # AI-NAS Media Manager - API 文档
 
 ## 基础信息

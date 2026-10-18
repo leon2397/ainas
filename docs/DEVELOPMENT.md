@@ -1,3 +1,10 @@
+# AINAS 开发指南
+
+> 版本：v1.0.0 | 更新日期：2026-10-18
+> 本文由 V7 时代 `DEVELOPMENT_RULES.md` 迁移并持续维护，是当前开发规范。
+
+---
+
 # AI-NAS V7.0 开发规范
 
 > 适用版本：V7.0.0+
@@ -72,9 +79,11 @@ AI-NAS-V7.0.0/
 │   └── tests/                  # 测试
 ├── frontend/                   # 前端（React）
 ├── config/                     # YAML 配置文件
-├── docs/                       # 项目文档
-├── BUGS.md                     # BUG 记录
-├── DEVELOPMENT_RULES.md        # 本文件
+├── docs/                       # 项目文档（入口 docs/README.md）
+│   ├── TROUBLESHOOTING.md      # 故障排查 + BUG 记录
+│   ├── DEVELOPMENT.md          # 本文件
+│   ├── adr/                    # 架构决策记录
+│   └── archive/                # 历史归档
 └── CHANGELOG.md                # 变更日志
 ```
 
@@ -208,7 +217,7 @@ rows = await db.fetchall(f"SELECT * FROM media WHERE type = '{type_name}'")
   │
   ├─ 阻断型 BUG（无法继续测试）→ 立即修复
   │
-  └─ 非阻断型 BUG → 记录到 BUGS.md → 继续测试
+  └─ 非阻断型 BUG → 记录到 docs/TROUBLESHOOTING.md → 继续测试
                                       │
                                       ▼
                                测试完成后
@@ -229,7 +238,7 @@ rows = await db.fetchall(f"SELECT * FROM media WHERE type = '{type_name}'")
 
 1. **先理解根因**，不要只改表面
 2. **修复后验证**，确认没有回归
-3. **更新 BUGS.md 状态**，从「待修复」改为「已修复」
+3. **更新 docs/TROUBLESHOOTING.md 状态**，从「待修复」改为「已修复」
 4. **写 CHANGELOG**，记录修复内容
 
 ---
@@ -240,7 +249,7 @@ rows = await db.fetchall(f"SELECT * FROM media WHERE type = '{type_name}'")
 
 1. **停止**当前尝试
 2. **独立验证**：创建最小复现脚本，隔离问题
-3. **记录跳步**：将问题和当前进度写入 BUGS.md，标记状态
+3. **记录跳步**：将问题和当前进度写入 docs/TROUBLESHOOTING.md，标记状态
 4. **切换任务**：做其他能推进的事
 5. **寻求帮助**：如果独立验证也失败，向 leon 报告
 

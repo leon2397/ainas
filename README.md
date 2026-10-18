@@ -2,8 +2,8 @@
 
 > NAS 上的图片视频，用 AI 管理海量私有资产——私有部署，数据不出户。
 
-![Version](https://img.shields.io/badge/version-7.0.0-blue)
-![Python](https://img.shields.io/badge/python-3.12+-green)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Python](https://img.shields.io/badge/python-3.11+-green)
 ![FastAPI](https://img.shields.io/badge/fastapi-0.115.5-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -141,16 +141,18 @@ pip install -r backend/requirements.txt
 pytest backend/tests/ -q          # 或 python backend/run_tests.py
 ```
 
-- 开发规范：[DEVELOPMENT_RULES.md](DEVELOPMENT_RULES.md)
-- 已知问题与修复记录：[BUGS.md](BUGS.md)
+- 📚 **文档中心（先看这里）**：[docs/README.md](docs/README.md)
+- 开发规范：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- 故障排查与已知问题：[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 - 版本历史：[CHANGELOG.md](CHANGELOG.md)
+- 架构决策记录：[docs/adr/](docs/adr/)
 - 部署后 API 文档：http://localhost:8000/docs
 
 ## 当前状态
 
-- 代码基底：V7.0.0（群晖/威联通/Docker 生产验证版）
-- 本仓库为 V7 重组基线：已清除开发杂物、运行时数据与敏感配置
-- 已知问题：见 BUGS.md（12 条记录，9 条已修复闭环）
+- 代码基底：V7.0.0（群晖/威联通/Docker 生产验证版），2026-10-18 重组为 v1.0.0 基线
+- 重组内容：清除开发杂物/运行时数据/敏感配置；修复 9 个 V7 遗留缺陷（含前端页面模块加载全线崩溃）；冒烟 + 无头浏览器端到端验证通过
+- 已知问题：见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 - 远端仓库：待定（GitHub / Gitee）
 
 ## License
