@@ -6,6 +6,8 @@
 ![Python](https://img.shields.io/badge/python-3.11+-green)
 ![FastAPI](https://img.shields.io/badge/fastapi-0.115.5-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
+[![CI](https://github.com/leon2397/ainas/actions/workflows/ci.yml/badge.svg)](https://github.com/leon2397/ainas/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/leon2397/ainas)](https://github.com/leon2397/ainas/releases/latest)
 
 ---
 
@@ -152,9 +154,13 @@ pytest backend/tests/ -q          # 或 python backend/run_tests.py
 
 - 代码基底：V7.0.0（群晖/威联通/Docker 生产验证版），2026-10-18 重组为 v1.0.0 基线
 - 重组内容：清除开发杂物/运行时数据/敏感配置；修复 9 个 V7 遗留缺陷（含前端页面模块加载全线崩溃）；冒烟 + 无头浏览器端到端验证通过
+- CI 状态：单元测试（81 项）/ 导入冒烟 / Docker 构建 全部通过
 - 已知问题：见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-- 远端仓库：待定（GitHub / Gitee）
+- 远端仓库：https://github.com/leon2397/ainas
+- 历史版本：V6.0.3 快照归档于 [qizhiainas-archive](https://github.com/leon2397/qizhiainas-archive)
+- 配套工具：[nastool](https://github.com/leon2397/nastool) —— 通用 NAS 设备检测工具
 
 ## License
 
+MIT
 MIT
