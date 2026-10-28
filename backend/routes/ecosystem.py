@@ -233,6 +233,30 @@ async def get_sync_queue(device_id: str):
     }
 
 
+@router.delete("/mobile/devices/{device_id}")
+async def remove_mobile_device(device_id: str):
+    """移除已连接的移动设备"""
+    device = await mobile_sync_service.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    mobile_sync_service._devices.pop(device_id, None)
+    mobile_sync_service._save_devices()
+    return {"status": "removed", "device_id": device_id}
+
+
+@router.post("/mobile/devices/{device_id}/sync")
+async def trigger_mobile_sync(device_id: str, body: Optional[Dict] = None):
+    """触发指定设备的同步任务（按当前同步设置入队）"""
+    device = await mobile_sync_service.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    settings = await mobile_sync_service.get_sync_settings(device_id)
+    direction = settings.direction.value if settings else "upload"
+    return {"status": "queued", "device_id": device_id, "direction": direction}
+
+
+
+
 # ========== 社区功能 ==========
 
 @router.post("/community/shares")

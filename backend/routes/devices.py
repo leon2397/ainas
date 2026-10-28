@@ -2,14 +2,23 @@
 Devices API Routes
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from typing import List, Optional
 from pydantic import BaseModel
+import json
+import os
+from pathlib import Path
 import requests
 
 from database.db import Database, get_db
 
 router = APIRouter(prefix="/api/devices", tags=["Devices"])
+
+# 诊断报告存档目录（AINAS 补充分支新增）
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DEVICE_REPORTS_DIR = (
+    Path(os.environ.get("AI_NAS_DATA_DIR", str(_REPO_ROOT / "data"))) / "device_reports"
+)
 
 
 # ============ Models ============
@@ -92,6 +101,40 @@ async def get_device_info(device_id: str, db: Database = Depends(get_db)):
         return response.json()
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@router.post("/{device_id}/diagnosis")
+async def save_device_diagnosis(
+    device_id: str,
+    report: dict = Body(...),
+    db: Database = Depends(get_db),
+):
+    """存档设备端上报的诊断报告（AINAS 补充分支）"""
+    device = await db.fetchone("SELECT * FROM devices WHERE device_id = ?", (device_id,))
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    safe_id = "".join(c for c in device_id if c.isalnum() or c in "-_.")[:128] or "unknown"
+    _DEVICE_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    target = _DEVICE_REPORTS_DIR / f"{safe_id}.json"
+    with open(target, "w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+    return {"status": "stored", "device_id": device_id, "path": str(target)}
+
+
+@router.get("/{device_id}/diagnosis")
+async def get_device_diagnosis(device_id: str, db: Database = Depends(get_db)):
+    """读取设备诊断报告（AINAS 补充分支）"""
+    device = await db.fetchone("SELECT * FROM devices WHERE device_id = ?", (device_id,))
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    safe_id = "".join(c for c in device_id if c.isalnum() or c in "-_.")[:128] or "unknown"
+    target = _DEVICE_REPORTS_DIR / f"{safe_id}.json"
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="Diagnosis report not found")
+    with open(target, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 @router.post("/add")

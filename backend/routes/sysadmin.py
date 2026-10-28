@@ -267,6 +267,27 @@ async def create_audit_log(
     return {"id": log_id, "status": "created"}
 
 
+@router.get("/audit/logs/{log_id}")
+async def get_audit_log_detail(
+    log_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """获取单条审计日志详情"""
+    init_sample_logs()  # 初始化示例数据
+    log = next((l for l in audit_store.logs if l.get("id") == log_id), None)
+    if not log:
+        raise HTTPException(status_code=404, detail="Audit log not found")
+    return {"log": log}
+
+
+@router.delete("/audit/clear")
+async def clear_audit_logs(current_user: dict = Depends(get_current_user)):
+    """清空所有审计日志"""
+    count = len(audit_store.logs)
+    audit_store.logs = []
+    return {"status": "cleared", "count": count}
+
+
 # ============ System Routes ============
 
 @router.get("/system/info")

@@ -323,6 +323,35 @@ class APIModule {
         return this.request('/api/system/audit/clear', { method: 'DELETE' });
     }
 
+    // ── 媒体上传（XHR 支持上传进度回调；fetch 无法监听 upload 进度）──
+    async upload(file, deviceId, onProgress) {
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            const url = `/api/media/upload?device_id=${encodeURIComponent(deviceId || 'default')}`;
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+            if (this.authToken) xhr.setRequestHeader('Authorization', 'Bearer ' + this.authToken);
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && typeof onProgress === 'function') {
+                    onProgress(Math.round((e.loaded / e.total) * 100));
+                }
+            };
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try { resolve(JSON.parse(xhr.responseText)); }
+                    catch (e) { resolve(xhr.responseText); }
+                } else {
+                    let msg = '上传失败 (' + xhr.status + ')';
+                    try { msg = (JSON.parse(xhr.responseText).detail) || msg; } catch (e) {}
+                    reject(new Error(msg));
+                }
+            };
+            xhr.onerror = () => reject(new Error('网络错误，上传失败'));
+            xhr.send(formData);
+        });
+    }
+
     // AI APIs
     async getAIStats() {
         return this.request('/api/ai/stats');
@@ -336,15 +365,21 @@ class APIModule {
     }
 
     async getFaceAlbums() {
-        return this.request('/api/ai/faces/albums');
+        // 后端 GET /api/ai/faces 返回 { faces:[...], total, total_faces }
+        const data = await this.request('/api/ai/faces');
+        return (data && data.faces) || [];
     }
 
     async getSmartAlbums() {
-        return this.request('/api/ai/albums/smart');
+        // 后端 GET /api/ai/smart-albums 返回 { albums:[...], total }
+        const data = await this.request('/api/ai/smart-albums');
+        return (data && data.albums) || [];
     }
 
     async getSimilarPhotos(mediaId, threshold = 0.8) {
-        return this.request(`/api/ai/similar/${mediaId}?threshold=${threshold}`);
+        // 后端 GET /api/ai/similar 返回相似图组 { groups:[...], total }（mediaId 仅用于前端上下文，后端返回全部分组）
+        const data = await this.request(`/api/ai/similar?threshold=${threshold}`);
+        return (data && data.groups) || [];
     }
 
     async runAutoTagging(mediaIds = []) {
@@ -371,11 +406,13 @@ class APIModule {
     }
 
     async getCloudSyncStatus() {
-        return this.request('/api/cloud/sync/status');
+        // 后端对应 GET /api/cloud/status
+        return this.request('/api/cloud/status');
     }
 
     async triggerCloudSync() {
-        return this.request('/api/cloud/sync', { method: 'POST' });
+        // 后端对应 POST /api/cloud/backup（无 file_ids 时备份全部）
+        return this.request('/api/cloud/backup', { method: 'POST' });
     }
 }
 
