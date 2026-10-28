@@ -1,0 +1,31 @@
+# 统一换行符
+#
+# 为什么重要：Windows 默认检出时把 LF 转成 CRLF。而 GitHub Actions 的
+# YAML 解析、shell 脚本（#!/usr/bin/env bash）都要求 LF——转成 CRLF 会导致
+# 「bad indentation」或「no such file or directory」。
+#
+# 规则：
+#   * 文本文件一律存为 LF
+#   * Windows 批处理必须存为 CRLF（cmd.exe 不认 LF）
+#   * 二进制文件不做转换
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.onnx binary
+*.bin binary
+*.zip binary
+*.whl binary
+*.tar.gz binary
