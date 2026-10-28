@@ -97,26 +97,44 @@ jobs:
 
       - name: 生成变更日志
         id: changelog
+        # 多行内容写入 $GITHUB_OUTPUT 必须用分隔符语法：
+        #   key<<DELIMITER ... DELIMITER
+        # 直接写多行会报 "Invalid format"——输出文件是单行 key=value 格式。
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || echo "")
-          if [ -n "$PREV" ]; then
-            echo "range=$PREV..$TAG" >> $GITHUB_OUTPUT
-            {
-              echo "## 变更内容"
-              echo ""
+
+          {
+            echo "## 变更内容"
+            echo ""
+            if [ -n "$PREV" ]; then
               git log --pretty="- %s (%h)" "$PREV..$TAG"
               echo ""
               echo "**完整变更**：https://github.com/${{ github.repository }}/compare/$PREV...$TAG"
-            } >> $GITHUB_OUTPUT
-          else
-            echo "range=" >> $GITHUB_OUTPUT
-            {
-              echo "## 变更内容"
-              echo ""
+            else
               git log --pretty="- %s (%h)" -20
-            } >> $GITHUB_OUTPUT
-          fi
+            fi
+
+            echo ""
+            echo "## Docker 使用"
+            echo ""
+            echo '```bash'
+            echo "docker pull ghcr.io/${{ github.repository }}:$TAG"
+            echo ""
+            echo "docker run -d --name ainas -p 8000:8000 \\"
+            echo "  -v /你的/媒体目录:/nas \\"
+            echo "  -v ainas-data:/app/data \\"
+            echo "  ghcr.io/${{ github.repository }}:$TAG"
+            echo '```'
+            echo ""
+            echo "首次启动会随机生成 admin 密码并打印在启动日志中，请从日志获取后立即修改。"
+          } > /tmp/changelog.md
+
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            cat /tmp/changelog.md
+            echo "CHANGELOG_EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: 创建 Release
         env:
@@ -127,21 +145,3 @@ jobs:
             --title "AINAS $TAG" \
             --notes "${{ steps.changelog.outputs.changelog }}" \
             --verify-tag
-
-      - name: 附加镜像使用说明
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
-        run: |
-          gh release edit "$TAG" --notes "$(gh release view "$TAG" --json body --jq .body)
-
-          echo ""
-          echo "## Docker 使用"
-          echo ""
-          echo '```bash'
-          echo "docker pull ghcr.io/${{ github.repository }}:$TAG"
-          echo "docker run -d --name ainas -p 8000:8000 \\"
-          echo "  -v /你的/媒体目录:/nas \\"
-          echo "  -v ainas-data:/app/data \\"
-          echo "  ghcr.io/${{ github.repository }}:$TAG"
-          echo '```'
