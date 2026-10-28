@@ -15,7 +15,7 @@ Backend Pod (amd64) <---> ARM Pod(s) (arm64, HPA 1-5)
 |------|-------------|
 | namespace.yaml | Namespace + labels |
 | configmap.yaml | Non-sensitive configuration |
-| secret.yaml | Sensitive data (JWT, keys) |
+| secret.example.yaml | 敏感数据模板（JWT、密钥）——**真实 secret.yaml 不入库**，需自行复制并填写 |
 | windows-deployment.yaml | Backend deploy + service + PVCs |
 | arm-deployment.yaml | ARM deploy + service + PVC + affinity |
 | arm-service.yaml | NodePort + Ingress + gateway |
@@ -23,12 +23,14 @@ Backend Pod (amd64) <---> ARM Pod(s) (arm64, HPA 1-5)
 
 ## Quick Deploy
 
-1. Apply namespace + secrets (edit jwt-secret first)
-2. Apply configmap (customize for your env)
-3. Apply windows-deployment.yaml (backend)
-4. Apply arm-deployment.yaml + arm-service.yaml + hpa.yaml
-5. Verify: kubectl get pods,svc,hpa,pvc -n ai-nas
-6. Access via port-forward or Ingress/NodePort
+1. 准备密钥：`cp secret.example.yaml secret.yaml`，填入真实 jwt-secret 后再应用
+   （`secret.yaml` 已在 .gitignore 中，不会被提交；公网可见的仓库等同于密钥公开）
+2. Apply namespace + secrets
+3. Apply configmap (customize for your env)
+4. Apply windows-deployment.yaml (backend)
+5. Apply arm-deployment.yaml + arm-service.yaml + hpa.yaml
+6. Verify: kubectl get pods,svc,hpa,pvc -n ai-nas
+7. Access via port-forward or Ingress/NodePort
 
 ## Scaling
 
@@ -45,7 +47,7 @@ Auto: HPA triggers on CPU 70% / Memory 80%, range 1-5 pods
 
 ## Production Checklist
 
-- [ ] Replace jwt-secret in secret.yaml
+- [ ] Replace jwt-secret in secret.yaml（从 secret.example.yaml 复制后填写）
 - [ ] Configure NFS StorageClass for RWX
 - [ ] Set up Ingress TLS
 - [ ] Prometheus monitoring

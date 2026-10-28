@@ -4,6 +4,13 @@
 *.pem
 !*.example
 
+# K8s 真实密钥不入库（仅提交 example 版本）
+k8s/secret.yaml
+!k8s/secret.example.yaml
+
+# 测试临时产物
+.pytest_baseline.xml
+
 # 运行时数据与日志（保留目录结构）
 logs/
 data/
@@ -17,6 +24,9 @@ nas/
 *.db
 *.db-wal
 *.db-shm
+# 运行时自动生成的密钥文件（后端首次启动会写入 data/.env）
+.env.local
+**/data/.env
 
 # Python
 __pycache__/

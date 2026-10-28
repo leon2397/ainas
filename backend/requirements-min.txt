@@ -1,3 +1,12 @@
+# AI-NAS 最小可运行依赖
+#
+# 用途：本地快速验证、CI 单元测试与导入冒烟。
+# 不含 AI 推理重依赖（chromadb / onnxruntime / scikit-learn），
+# 完整依赖见 requirements.txt。
+#
+# ⚠️ 维护要求：这里列的每一个包，后端都必须能在「只装这份清单」的环境里
+#    完整 import main 成功。导入冒烟 CI job 就是为此存在。
+#    少列一个包，CI 会在导入冒烟那一步红给你看。
 fastapi==0.115.0
 uvicorn==0.32.0
 aiosqlite==0.20.0
@@ -6,3 +15,23 @@ numpy==2.1.3
 pydantic==2.9.2
 psutil==6.1.0
 pyyaml==6.0.2
+python-multipart==0.0.17
+requests==2.32.3
+python-dotenv==1.0.1
+websockets==13.1
+
+# 认证（JWT）——登录接口必需
+python-jose[cryptography]==3.3.0
+
+# 日志——后端模块几乎都 import loguru，缺失会导致 import 直接失败
+loguru==0.7.2
+
+# 定时任务——后台调度器必需
+apscheduler==3.11.0
+
+# 云存储插件与 SSH 存储的传输层（routes/ecosystem.py 会在导入时拉起）
+aiohttp==3.11.2
+paramiko==3.5.0
+
+# 人脸/图像处理（modules/mod_ai 在导入时依赖 cv2）
+opencv-python-headless==4.10.0.84

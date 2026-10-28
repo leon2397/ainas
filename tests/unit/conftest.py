@@ -7,9 +7,12 @@ import tempfile
 import os
 from pathlib import Path
 
-# 添加backend到路径
+# 添加 backend 到路径
+# 本文件位于 <repo>/tests/unit/conftest.py，backend 目录在 <repo>/backend，
+# 因此需要向上三层（unit → tests → repo 根），再拼接 backend。
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(_REPO_ROOT / "backend"))
 
 
 @pytest.fixture(scope="session")

@@ -1,0 +1,206 @@
+# AINAS CI
+#
+# 设计要点（都来自实际踩过的坑，不是通用模板）：
+#
+#   1. 只跑 backend/tests/unit/ —— 这是 V7 重组后与当前代码对齐的测试集（80 项）。
+#      根目录 tests/unit/ 有 364 项，但那是重组前的旧架构测试，仍在引用
+#      storage / plugins.marketplace / sync.mobile 等已迁走的模块，364 项里 362 项失败。
+#      让它们进 CI 只会让 CI 一上来就红，红了就没人看——那等于没有 CI。
+#      迁移计划见 docs/TROUBLESHOOTING.md「旧测试套件待迁移」。
+#
+#   2. pytest 必须用 --junit-xml 取结果 —— conftest.py 里的强制退出钩子会让
+#      CLI 的终端汇总被吞掉（aiosqlite Connection 继承 Thread 且非 daemon，
+#      进程退出时挂住）。JUnit XML 是唯一可靠的取数方式。
+#
+#   3. lint 不阻塞后续 job —— 旧 CI 的 lint 一挂，后面 unit/integration/e2e/release
+#      全被 skip，测试与发布链路一次都没真跑过。这里让 lint 失败也继续跑测试，
+#      至少保证「测试是绿的」这个信号可信。
+#
+#   4. 安装依赖用 requirements-min.txt —— 完整 requirements.txt 含 chromadb、
+#      onnxruntime、opencv，CI 里装得慢且容易因平台差异失败；单测不需要它们。
+#
+#   5. 数据库路径用绝对路径 —— 代码里 DATABASE_PATH 相对 cwd，
+#      在 CI 里 cwd 是仓库根，测试跑在 backend/ 下会写出两份库。显式指定。
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+# 同一分支的新 push 取消旧任务，避免排队堆积
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: 代码规范
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装 lint 工具
+        run: python -m pip install --upgrade pip ruff
+
+      - name: Ruff 检查
+        # 不阻塞：见文件头第 3 点。先把信号发出去，后面再逐步收紧。
+        continue-on-error: true
+        run: |
+          ruff check backend/ --output-format=github || true
+
+      - name: Ruff 格式检查（仅统计，不拦截）
+        continue-on-error: true
+        run: |
+          ruff format --check backend/ 2>&1 | tail -20 || true
+
+  unit-test:
+    name: 单元测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements-min.txt
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-min.txt
+          pip install pytest==8.3.3 pytest-asyncio==0.24.0 httpx==0.27.2
+          pip install "python-jose[cryptography]==3.3.0"
+
+      - name: 运行单元测试
+        # --junit-xml 是必须的：终端汇总会被 conftest 的退出钩子吞掉
+        run: |
+          python -m pytest backend/tests/unit/ \
+            --junit-xml=pytest-report.xml \
+            --tb=short
+
+      - name: 校验测试结果
+        # 显式校验：pytest 进程被挂住时退出码不可靠，以 XML 里的计数为准
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          import sys
+
+          root = ET.parse("pytest-report.xml").getroot()
+          suites = root.findall(".//testsuite")
+          total = sum(int(s.get("tests", 0)) for s in suites)
+          failed = sum(int(s.get("failures", 0)) for s in suites)
+          errored = sum(int(s.get("errors", 0)) for s in suites)
+
+          print(f"用例 {total} 项，失败 {failed}，错误 {errored}")
+          if total == 0:
+              print("没有收集到任何用例——测试根本没跑起来")
+              sys.exit(1)
+          if failed or errored:
+              print("有测试未通过")
+              sys.exit(1)
+          print(f"OK {total} 项全通过")
+          PY
+
+      - name: 上传测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: pytest-report.xml
+          retention-days: 14
+
+  import-smoke:
+    name: 导入冒烟
+    # 验证后端能被真正加载——单元测试可能只覆盖了部分模块，
+    # 而「import 就崩」是这类项目最常见的线上故障
+    runs-on: ubuntu-latest
+    needs: unit-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements-min.txt
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-min.txt
+
+      - name: 加载应用与路由清单
+        env:
+          AI_NAS_JWT_SECRET: ci-smoke-test-secret-not-for-production
+        run: |
+          cd backend
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+
+          # 与代码里的路径解析保持一致
+          sys.path.insert(0, str(Path.cwd()))
+
+          import main
+          print("main.py 导入成功")
+
+          # 统计路由，确认没有静默丢失
+          # 实测基线：总路由 235 条，其中 API 219 条。
+          # 阈值取基线的八成——既能挡住「装配失败导致路由大面积消失」，
+          # 又不会因为新增/删除几个路由就误报。
+          routes = getattr(main.app, "routes", [])
+          api_routes = [r for r in routes if getattr(r, "path", "").startswith("/api/")]
+          print(f"注册路由 {len(routes)} 条，其中 API {len(api_routes)} 条")
+          if len(api_routes) < 175:
+              print(f"API 路由数量异常偏少（{len(api_routes)}，基线 219），可能装配失败")
+              sys.exit(1)
+          if len(routes) < 190:
+              print(f"总路由数量异常偏少（{len(routes)}，基线 235），可能装配失败")
+              sys.exit(1)
+          print("OK")
+          PY
+
+  docker-build:
+    name: Docker 镜像构建
+    runs-on: ubuntu-latest
+    needs: unit-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 构建后端镜像
+        # Dockerfile 在 backend/ 下，但 COPY 路径按仓库根组织
+        # （backend/ 与 frontend/ 必须同级，否则前端路径解析会指向不存在的 /frontend）
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: false
+          load: true
+          tags: ai-nas-backend:ci
+
+      - name: 验证镜像可启动
+        run: |
+          docker run --rm --entrypoint python ai-nas-backend:ci -c "
+          import sys
+          sys.path.insert(0, '/app/backend')
+          import main
+          print('镜像内后端导入成功，路由', len(getattr(main.app, 'routes', [])), '条')
+          "

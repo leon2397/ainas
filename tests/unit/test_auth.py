@@ -2,7 +2,8 @@
 认证模块单元测试
 """
 import pytest
-import jwt
+from jose import jwt
+from jose.exceptions import JWTError, JWSError
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
@@ -169,7 +170,7 @@ class TestJWTValidation:
     
     def test_invalid_token_format(self, auth_manager):
         """测试无效令牌格式"""
-        with pytest.raises(jwt.InvalidTokenError):
+        with pytest.raises(JWTError):
             auth_manager.decode_token("invalid_token")
     
     def test_tampered_token(self, auth_manager):
@@ -177,7 +178,7 @@ class TestJWTValidation:
         token = auth_manager.create_access_token(1, "test", "user")
         tampered = token[:-10] + "XXXXXXXXXX"  # 篡改末尾
         
-        with pytest.raises(jwt.InvalidSignatureError):
+        with pytest.raises(JWSError):
             auth_manager.decode_token(tampered)
 
 
