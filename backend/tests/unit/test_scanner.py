@@ -348,17 +348,42 @@ class TestMediaScannerErrorHandling:
 
     @pytest.mark.asyncio
     async def test_permission_error_handling(self):
-        """测试权限错误处理"""
+        """测试权限错误处理
+
+        场景：扫描一个当前进程无权访问的目录。
+        期望：返回错误信息，而不是抛出异常让整个扫描任务崩溃。
+
+        注意：不能依赖具体路径（如 /root/system/secret）——
+        那是 Linux 特有的，Windows 上不存在，会退化成「路径不存在」分支，
+        等于没测到权限这条路径。所以这里用 mock 精确模拟 PermissionError，
+        让所有平台都真正走到这条分支。
+        """
         db = Database(":memory:")
         await db.init()
         scanner = MediaScanner(db)
-        
-        # 扫描一个无法访问的路径（如果有）
-        result = await scanner.scan_directory("/root/system/secret")
-        
+
+        with patch.object(Path, "exists", side_effect=PermissionError(
+                13, "Permission denied", "/root/system/secret")):
+            result = await scanner.scan_directory("/root/system/secret")
+
         # 应该返回错误而不是崩溃
-        assert "error" in result or result["errors"] > 0
-        
+        assert "error" in result, f"应返回 error，实际得到: {result}"
+        assert "not accessible" in result["error"]
+
+        await db.close()
+
+    @pytest.mark.asyncio
+    async def test_nonexistent_path_returns_error(self):
+        """扫描不存在的路径应返回错误而非崩溃"""
+        db = Database(":memory:")
+        await db.init()
+        scanner = MediaScanner(db)
+
+        result = await scanner.scan_directory("/definitely/not/exist/path")
+
+        assert "error" in result
+        assert "does not exist" in result["error"]
+
         await db.close()
 
 

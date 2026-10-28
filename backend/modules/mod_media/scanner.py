@@ -100,8 +100,13 @@ class MediaScanner:
 
         try:
             root = Path(root_path)
-            if not root.exists():
-                return {'error': f'Path does not exist: {root_path}'}
+            # exists() 本身可能抛 PermissionError（无权限访问的目录），
+            # 不能只判断「路径不存在」——扫描无权目录应返回错误，而不是让整个任务崩掉。
+            try:
+                if not root.exists():
+                    return {'error': f'Path does not exist: {root_path}'}
+            except OSError as e:
+                return {'error': f'Path is not accessible: {root_path} ({e})'}
 
             # 1) 单次全树遍历收集媒体文件（大小写归一）
             files, walk_errors = self._collect_files(root, recursive, allowed)
